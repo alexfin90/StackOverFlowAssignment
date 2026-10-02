@@ -3,6 +3,10 @@ plugins {
 }
 
 kotlin {
+    // Explicit API mode: every public declaration must state its visibility and
+    // type explicitly. Since this module is an SDK consumed by third parties,
+    // this keeps the public surface deliberate and prevents accidental exposure
+    // of internal classes.
     explicitApi()
 }
 
