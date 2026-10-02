@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "StackOverFlow Home Assignment"
 include(":app")
+include(":stackoverflowsdk")
