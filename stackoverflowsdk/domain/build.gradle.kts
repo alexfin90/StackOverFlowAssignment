@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
 }
 
-// Pure Kotlin/JVM: domain models and contracts, no Android dependencies.
+// Pure Kotlin/JVM, zero third-party dependencies: models and contracts only.
 kotlin {
     explicitApi()
 }
