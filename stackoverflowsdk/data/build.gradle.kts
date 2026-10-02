@@ -18,6 +18,7 @@ kotlin {
 dependencies {
     api(project(":stackoverflowsdk:domain"))
     implementation(libs.retrofit)
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.kotlinx.serialization.json)
 
