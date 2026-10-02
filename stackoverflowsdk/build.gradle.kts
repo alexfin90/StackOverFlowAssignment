@@ -8,6 +8,7 @@ kotlin {
     // this keeps the public surface deliberate and prevents accidental exposure
     // of internal classes.
     explicitApi()
+    jvmToolchain(17)
 }
 
 android {
@@ -20,10 +21,6 @@ android {
         minSdk = 24
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 
 }
