@@ -19,20 +19,15 @@ android {
 
     defaultConfig {
         minSdk = 24
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
 }
 
 dependencies {
+    // Deliberately no appcompat/material/core-ktx: every dependency of an SDK ends up in the
+    // host app, so we only declare what the code needs.
     // Facade: re-exports the domain API; data stays an implementation detail.
     api(project(":stackoverflowsdk:domain"))
     implementation(project(":stackoverflowsdk:data"))
-    implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.material)
     testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
 }
