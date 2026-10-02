@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
@@ -13,14 +11,8 @@ plugins {
 // conflicts").
 kotlin {
     explicitApi()
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    // Pins Java and Kotlin compilation to JDK 17 (auto-provisioned via foojay if missing).
+    jvmToolchain(17)
 }
 
 dependencies {
