@@ -29,6 +29,9 @@ android {
 }
 
 dependencies {
+    // Facade: re-exports the domain API; data stays an implementation detail.
+    api(project(":stackoverflowsdk:domain"))
+    implementation(project(":stackoverflowsdk:data"))
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
