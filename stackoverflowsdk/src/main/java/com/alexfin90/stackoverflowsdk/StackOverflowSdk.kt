@@ -1,7 +1,6 @@
 package com.alexfin90.stackoverflowsdk
 
 import com.alexfin90.stackoverflowsdk.data.createQuestionsRepository
-import com.alexfin90.stackoverflowsdk.domain.InternalStackOverflowApi
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 
 /**
@@ -22,7 +21,6 @@ import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 public object StackOverflowSdk {
 
     /** Creates a repository. Keep and reuse the instance: it owns the HTTP client. */
-    @OptIn(InternalStackOverflowApi::class)
     public fun create(config: StackOverflowConfig = StackOverflowConfig()): QuestionsRepository =
         createQuestionsRepository(
             baseUrl = config.baseUrl,

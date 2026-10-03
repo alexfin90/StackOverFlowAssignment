@@ -93,20 +93,17 @@ libraries, and the risk is contained:
 - Rule: no `:data` type may appear in a public signature of the facade, otherwise `implementation`
   would not be enough.
 
-### Why `@InternalStackOverflowApi`?
+### Why is `createQuestionsRepository()` public?
 
 Kotlin's `internal` is scoped to a **Gradle module**, so the facade cannot see `internal`
 declarations of `:data`. The one symbol it needs, `createQuestionsRepository()`, must therefore be
-`public`. It is annotated with `@InternalStackOverflowApi` (`@RequiresOptIn`, level `ERROR`): the
-facade opts in explicitly, while any other caller gets a **compile error**.
+`public`. A host app still cannot reach it: `:stackoverflowsdk` declares `:data` with
+`implementation`, so the module is not on the app's compile classpath. The KDoc states that it is
+not part of the supported API.
 
-There are two layers of protection:
-
-1. `:stackoverflowsdk` declares `:data` with `implementation`, so a host app does not even see the
-   module on its compile classpath.
-2. If `:data` were ever exposed (an `api(...)` by mistake, or published as a separate artifact),
-   the opt-in marker still prevents accidental use and states the intent: the symbol is public for
-   technical reasons only and is **not** part of the supported API.
+> A `@RequiresOptIn` marker would add a second layer of protection (useful if `:data` were ever
+> exposed with `api(...)` or published as its own artifact). It was left out on purpose to keep the
+> public surface and the amount of concepts small.
 
 ### Patterns: Facade and Singleton
 
