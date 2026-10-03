@@ -25,6 +25,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    flavorDimensions += "environment"
+    productFlavors {
+        // Talks to the real Stack Exchange API through the SDK.
+        create("real") {
+            dimension = "environment"
+        }
+        // In-memory data, no networking: offline development, demos, UI work.
+        create("mock") {
+            dimension = "environment"
+            applicationIdSuffix = ".mock"
+            versionNameSuffix = "-mock"
+        }
+    }
+
     buildTypes {
         release {
             optimization {
@@ -56,6 +70,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(project(":stackoverflowsdk"))
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(project(":core:dispatcher"))

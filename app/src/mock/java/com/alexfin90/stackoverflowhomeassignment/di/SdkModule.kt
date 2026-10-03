@@ -1,6 +1,6 @@
 package com.alexfin90.stackoverflowhomeassignment.di
 
-import com.alexfin90.stackoverflowsdk.StackOverflowSdk
+import com.alexfin90.stackoverflowhomeassignment.fake.FakeQuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import dagger.Module
 import dagger.Provides
@@ -8,12 +8,15 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/** Single place where the app creates the SDK; tests replace this module with a fake. */
+/**
+ * `mock` flavor: the app runs on in-memory data and never touches the SDK networking.
+ * Useful offline, for demos and for UI work.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object SdkModule {
 
     @Provides
     @Singleton
-    fun provideQuestionsRepository(): QuestionsRepository = StackOverflowSdk.questions
+    fun provideQuestionsRepository(): QuestionsRepository = FakeQuestionsRepository()
 }
