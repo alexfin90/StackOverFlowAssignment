@@ -14,9 +14,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** The client against a fake data source: no HTTP stack involved. */
+/** The repository against a fake data source: no HTTP stack involved. */
 @RunWith(RobolectricTestRunner::class)
-class StackOverflowClientImplTest {
+class QuestionsRepositoryImplTest {
 
     private class FakeRemote(var result: RemoteResult<QuestionsResponseDto>) : QuestionsRemoteDataSource {
         data class Call(val fromDate: Long, val page: Int, val pageSize: Int, val unansweredOnly: Boolean)
@@ -36,8 +36,8 @@ class StackOverflowClientImplTest {
 
     private val now = 1_700_000_000L
 
-    private fun client(remote: QuestionsRemoteDataSource) =
-        StackOverflowClientImpl(remote, pageSize = 20, lastDays = 30, nowEpochSeconds = { now })
+    private fun repository(remote: QuestionsRemoteDataSource) =
+        QuestionsRepositoryImpl(remote, pageSize = 20, lastDays = 30, nowEpochSeconds = { now })
 
     private fun dto(id: Long, title: String = "Q$id") =
         QuestionDto(id, title, "https://so/$id", 1_699_999_000, owner = OwnerDto("Ann"))
@@ -48,7 +48,7 @@ class StackOverflowClientImplTest {
             RemoteResult.Success(QuestionsResponseDto(listOf(dto(1, "A &amp; B"), dto(2)), hasMore = true)),
         )
 
-        val result = client(remote).getLatestQuestions() as QuestionsResult.Success
+        val result = repository(remote).getLatestQuestions() as QuestionsResult.Success
 
         assertEquals(listOf(1L, 2L), result.questions.map { it.id })
         assertEquals("A & B", result.questions[0].title)
@@ -59,7 +59,7 @@ class StackOverflowClientImplTest {
     fun `asks the remote for the last 30 days with the caller parameters`() = runTest {
         val remote = FakeRemote(RemoteResult.Success(QuestionsResponseDto()))
 
-        client(remote).getLatestQuestions(unansweredOnly = true, page = 3)
+        repository(remote).getLatestQuestions(unansweredOnly = true, page = 3)
 
         assertEquals(
             FakeRemote.Call(fromDate = now - 30 * 86_400L, page = 3, pageSize = 20, unansweredOnly = true),
@@ -71,7 +71,7 @@ class StackOverflowClientImplTest {
     fun `network failure becomes NetworkError`() = runTest {
         val remote = FakeRemote(RemoteResult.Failure.Network("offline"))
 
-        val result = client(remote).getLatestQuestions() as QuestionsResult.NetworkError
+        val result = repository(remote).getLatestQuestions() as QuestionsResult.NetworkError
 
         assertEquals("offline", result.message)
     }
@@ -80,14 +80,14 @@ class StackOverflowClientImplTest {
     fun `http failure becomes ApiError with the code`() = runTest {
         val remote = FakeRemote(RemoteResult.Failure.Http(400, "Bad Request"))
 
-        val result = client(remote).getLatestQuestions() as QuestionsResult.ApiError
+        val result = repository(remote).getLatestQuestions() as QuestionsResult.ApiError
 
         assertEquals(400, result.httpCode)
     }
 
     @Test
     fun `malformed body becomes ApiError without a code`() = runTest {
-        val result = client(FakeRemote(RemoteResult.Failure.Malformed("bad json")))
+        val result = repository(FakeRemote(RemoteResult.Failure.Malformed("bad json")))
             .getLatestQuestions() as QuestionsResult.ApiError
 
         assertNull(result.httpCode)
@@ -95,7 +95,7 @@ class StackOverflowClientImplTest {
 
     @Test
     fun `unexpected failure becomes ApiError without a code`() = runTest {
-        val result = client(FakeRemote(RemoteResult.Failure.Unexpected("bug")))
+        val result = repository(FakeRemote(RemoteResult.Failure.Unexpected("bug")))
             .getLatestQuestions() as QuestionsResult.ApiError
 
         assertNull(result.httpCode)
