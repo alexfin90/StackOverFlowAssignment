@@ -1,6 +1,8 @@
 package com.alexfin90.stackoverflowhomeassignment.core.designsystem
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -83,5 +85,24 @@ class ComponentsTest {
 
         composeRule.onNodeWithTag(TestTags.LOADING).assertIsDisplayed()
         composeRule.onNodeWithText("Nothing here").assertIsDisplayed()
+    }
+
+    @Test
+    fun questionRows_titlesAlignWhateverTheAnswerLabel() {
+        composeRule.setContent {
+            StackOverFlowTheme {
+                Column {
+                    QuestionRow(row.copy(id = 1, title = "First", answerCountLabel = "0 answers"), onClick = {})
+                    QuestionRow(row.copy(id = 2, title = "Second", answerCountLabel = "1 answer"), onClick = {})
+                    QuestionRow(row.copy(id = 3, title = "Third", answerCountLabel = "12 answers"), onClick = {})
+                }
+            }
+        }
+
+        val lefts = listOf("First", "Second", "Third").map {
+            composeRule.onNodeWithText(it).getBoundsInRoot().left
+        }
+
+        assertEquals(1, lefts.toSet().size)
     }
 }
