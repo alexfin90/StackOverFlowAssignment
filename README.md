@@ -204,8 +204,9 @@ when (val result = questions.getLatestQuestions(unansweredOnly = true, page = 1)
 |---|---|
 | `StackOverflowSdk.create(config)` | Single entry point. Cheap, does no I/O. |
 | `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (default 30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30). Validated at construction. |
-| `QuestionsRepository` | `suspend fun getLatestQuestions(unansweredOnly, page): QuestionsResult` |
+| `QuestionsRepository` | `suspend fun getLatestQuestions(unansweredOnly, page): QuestionsResult` and `suspend fun getQuestion(id): QuestionResult` |
 | `QuestionsResult` | Sealed: `Success(questions, hasMore)` / `NetworkError` / `ApiError(httpCode?, message)` |
+| `QuestionResult` | Same idea for one question: `Success(question)` / `NotFound` / `NetworkError` / `ApiError` |
 | `Question` | Plain domain model, independent from the wire format. Title is already HTML-decoded. |
 
 ### Coroutine cancellation
@@ -259,6 +260,7 @@ Base URL `https://api.stackexchange.com/` (v2.3). Both calls are `GET`, anonymou
 |---|---|---|
 | Latest questions | `/2.3/questions` | [docs](https://api.stackexchange.com/docs/questions) |
 | Unanswered questions (0 answers) | `/2.3/questions/no-answers` | [docs](https://api.stackexchange.com/docs/no-answer-questions) |
+| One question by id (detail, deep link) | `/2.3/questions/{id}` | [docs](https://api.stackexchange.com/docs/questions-by-ids) |
 
 | Query parameter | Value | Why |
 |---|---|---|

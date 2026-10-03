@@ -1,5 +1,6 @@
 package com.alexfin90.stackoverflowsdk.data
 
+import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
@@ -130,5 +131,39 @@ class QuestionsRepositoryImplTest {
         )
 
         assertTrue(offline.getLatestQuestions() is QuestionsResult.NetworkError)
+    }
+
+    @Test
+    fun `getQuestion maps the first item and calls the id endpoint`() = runTest {
+        server.enqueue(json(twoQuestions))
+
+        val result = repository.getQuestion(1)
+
+        assertEquals("/2.3/questions/1", server.takeRequest().requestUrl!!.encodedPath)
+        assertTrue(result is QuestionResult.Success)
+        assertEquals("A & B", (result as QuestionResult.Success).question.title)
+    }
+
+    @Test
+    fun `getQuestion with no items is NotFound`() = runTest {
+        server.enqueue(json("""{"items":[],"has_more":false}"""))
+
+        assertEquals(QuestionResult.NotFound, repository.getQuestion(999))
+    }
+
+    @Test
+    fun `getQuestion http error maps to ApiError`() = runTest {
+        server.enqueue(json("{}", code = 500))
+
+        val result = repository.getQuestion(1)
+
+        assertEquals(500, (result as QuestionResult.ApiError).httpCode)
+    }
+
+    @Test
+    fun `getQuestion connection failure maps to NetworkError`() = runTest {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+
+        assertTrue(repository.getQuestion(1) is QuestionResult.NetworkError)
     }
 }
