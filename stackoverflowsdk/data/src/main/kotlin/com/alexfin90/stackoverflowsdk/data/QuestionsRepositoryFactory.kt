@@ -25,7 +25,8 @@ public fun createQuestionsRepository(
     val client = NetworkModule.provideOkHttpClient(connectTimeoutSeconds, callTimeoutSeconds)
     val retrofit = NetworkModule.provideRetrofit(baseUrl, client, NetworkModule.provideJson())
     val service = NetworkModule.provideService(retrofit)
+    val remote = NetworkModule.provideRemoteDataSource(service)
     val repository: QuestionsRepository =
-        QuestionsRepositoryImpl(service, pageSize, lastDays, nowEpochSeconds)
+        QuestionsRepositoryImpl(remote, pageSize, lastDays, nowEpochSeconds)
     return if (logger != null) LoggingQuestionsRepository(repository, logger) else repository
 }

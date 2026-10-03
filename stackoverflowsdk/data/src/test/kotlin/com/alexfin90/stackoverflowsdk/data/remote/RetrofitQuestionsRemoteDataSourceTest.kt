@@ -1,0 +1,107 @@
+package com.alexfin90.stackoverflowsdk.data.remote
+
+import com.alexfin90.stackoverflowsdk.data.di.NetworkModule
+import kotlinx.coroutines.test.runTest
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+/** Transport behaviour: requests sent and exceptions translated, against a real HTTP stack. */
+class RetrofitQuestionsRemoteDataSourceTest {
+
+    private val server = MockWebServer()
+    private lateinit var remote: QuestionsRemoteDataSource
+
+    private fun remoteFor(baseUrl: String): QuestionsRemoteDataSource {
+        val client = NetworkModule.provideOkHttpClient(connectTimeoutSeconds = 5, callTimeoutSeconds = 10)
+        val retrofit = NetworkModule.provideRetrofit(baseUrl, client, NetworkModule.provideJson())
+        return NetworkModule.provideRemoteDataSource(NetworkModule.provideService(retrofit))
+    }
+
+    @Before
+    fun setUp() {
+        server.start()
+        remote = remoteFor(server.url("/").toString())
+    }
+
+    @After
+    fun tearDown() {
+        server.shutdown()
+    }
+
+    private fun json(body: String, code: Int = 200) =
+        MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(body)
+
+    private suspend fun latest(unanswered: Boolean = false) =
+        remote.getLatestQuestions(fromDate = 1_000, page = 2, pageSize = 20, unansweredOnly = unanswered)
+
+    @Test
+    fun `latest request targets the questions endpoint with the expected parameters`() = runTest {
+        server.enqueue(json("""{"items":[{"question_id":1,"title":"t","link":"l","creation_date":1}],"has_more":true}"""))
+
+        val result = latest()
+
+        val url = server.takeRequest().requestUrl!!
+        assertEquals("/2.3/questions", url.encodedPath)
+        assertEquals("1000", url.queryParameter("fromdate"))
+        assertEquals("2", url.queryParameter("page"))
+        assertEquals("20", url.queryParameter("pagesize"))
+        assertEquals("desc", url.queryParameter("order"))
+        assertEquals("creation", url.queryParameter("sort"))
+        assertEquals("stackoverflow", url.queryParameter("site"))
+        val body = (result as RemoteResult.Success).value
+        assertEquals(1L, body.items.single().questionId)
+        assertTrue(body.hasMore)
+    }
+
+    @Test
+    fun `unanswered request targets the no-answers endpoint`() = runTest {
+        server.enqueue(json("""{"items":[],"has_more":false}"""))
+
+        latest(unanswered = true)
+
+        assertEquals("/2.3/questions/no-answers", server.takeRequest().requestUrl!!.encodedPath)
+    }
+
+    @Test
+    fun `unknown json fields are ignored`() = runTest {
+        server.enqueue(json("""{"items":[{"question_id":1,"title":"t","link":"l","creation_date":1,"extra":1}],"quota_max":300}"""))
+
+        assertTrue(latest() is RemoteResult.Success)
+    }
+
+    @Test
+    fun `http error becomes Http failure with the code`() = runTest {
+        server.enqueue(json("""{"error_id":502,"error_name":"throttle_violation"}""", code = 400))
+
+        val result = latest()
+
+        assertEquals(400, (result as RemoteResult.Failure.Http).code)
+    }
+
+    @Test
+    fun `body that is not json becomes Malformed`() = runTest {
+        server.enqueue(json("not json"))
+
+        assertTrue(latest() is RemoteResult.Failure.Malformed)
+    }
+
+    @Test
+    fun `connection failure becomes Network`() = runTest {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+
+        assertTrue(latest() is RemoteResult.Failure.Network)
+    }
+
+    @Test
+    fun `unknown host becomes Network`() = runTest {
+        remote = remoteFor("http://nonexistent.invalid/")
+
+        assertTrue(latest() is RemoteResult.Failure.Network)
+    }
+}

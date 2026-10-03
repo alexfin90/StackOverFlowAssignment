@@ -1,5 +1,7 @@
 package com.alexfin90.stackoverflowsdk.data.di
 
+import com.alexfin90.stackoverflowsdk.data.remote.QuestionsRemoteDataSource
+import com.alexfin90.stackoverflowsdk.data.remote.RetrofitQuestionsRemoteDataSource
 import com.alexfin90.stackoverflowsdk.data.remote.StackExchangeService
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -35,4 +37,7 @@ internal object NetworkModule {
 
     fun provideService(retrofit: Retrofit): StackExchangeService =
         retrofit.create(StackExchangeService::class.java)
+
+    fun provideRemoteDataSource(service: StackExchangeService): QuestionsRemoteDataSource =
+        RetrofitQuestionsRemoteDataSource(service)
 }
