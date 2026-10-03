@@ -5,7 +5,10 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navDeepLink
+import com.alexfin90.stackoverflowhomeassignment.core.common.navigation.DeepLinks
 import com.alexfin90.stackoverflowhomeassignment.core.common.navigation.Route
+import com.alexfin90.stackoverflowhomeassignment.feature.detail.DetailRoute
 import com.alexfin90.stackoverflowhomeassignment.feature.home.HomeRoute
 
 @Composable
@@ -17,8 +20,17 @@ fun AppNavHost(modifier: Modifier = Modifier) {
         modifier = modifier,
     ) {
         composable<Route.QuestionsList> {
-            // The detail destination is added in the next PR.
-            HomeRoute(onQuestionClick = {})
+            HomeRoute(
+                onQuestionClick = { id -> navController.navigate(Route.QuestionDetail(id)) },
+            )
+        }
+        composable<Route.QuestionDetail>(
+            deepLinks = listOf(
+                // stackoverflowdemo://question/{questionId}
+                navDeepLink<Route.QuestionDetail>(basePath = DeepLinks.QUESTION_DETAIL_BASE),
+            ),
+        ) {
+            DetailRoute(onBack = { navController.popBackStack() })
         }
     }
 }
