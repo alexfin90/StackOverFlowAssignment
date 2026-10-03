@@ -6,7 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * Configures the SDK once, at startup. `initialize` is cheap, so it runs on the main thread;
+ * `real` flavor: configures the SDK once, at startup. `initialize` is cheap, so it runs on the main thread;
  * building the HTTP stack runs in the application scope, off the main thread.
  *
  * SDK logging goes to Logcat (tag `StackOverflowSdk`) in debug builds only.
