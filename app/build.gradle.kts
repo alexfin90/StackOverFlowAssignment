@@ -48,6 +48,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true // BuildConfig.DEBUG for StrictMode
     }
 }
 
@@ -76,4 +77,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    implementation(project(":core:dispatcher"))
+    implementation(libs.timber)
 }
