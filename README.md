@@ -183,17 +183,27 @@ not part of the supported API.
 
 ### Design patterns
 
-Where each pattern is used in the SDK, and why. Only patterns that exist in the code are listed.
+Where each pattern is used in the SDK, and why. Only things that exist in the code are listed, and
+they are labelled for what they are.
+
+**Design patterns (GoF)**
 
 | Pattern | Where | Why |
 |---|---|---|
 | **Facade** | `StackOverflowSdk` | One simple, stable entry point in front of Retrofit, DTOs, mappers and the HTTP client |
 | **Singleton** (with limits) | `StackOverflowSdk` (`object`) | Configure once at startup (`initialize`) and share one client |
 | **Decorator** | `LoggingQuestionsRepository` | Add logging around the repository without touching it, and only when enabled |
-| **Repository + Data Source** | `QuestionsRepositoryImpl` → `QuestionsRemoteDataSource` | The repository maps outcomes to public results; the data source owns the transport |
-| **Factory / composition root** | `createQuestionsRepository`, `NetworkModule` | The one place where the object graph is assembled (no DI framework in the SDK) |
-| **Mapper** | `QuestionDto.toDomain()` | The wire format never reaches the public model |
-| **Sealed result** | `QuestionsResult`, `RemoteResult` | Errors are values the caller must handle, not exceptions |
+
+**Architectural patterns**
+
+| Pattern | Where | Why |
+|---|---|---|
+| **Repository** + remote **data source** | `QuestionsRepositoryImpl` → `QuestionsRemoteDataSource` | The repository maps outcomes to public results; the data source owns the transport |
+| **Dependency injection** by constructor, with a **composition root** | `createQuestionsRepository`, `NetworkModule` | The one place where the object graph is assembled, with no DI framework in the SDK |
+
+**Idioms, not patterns:** sealed result types (`QuestionsResult`, `RemoteResult`) make errors values
+the caller must handle instead of exceptions; mapping functions (`QuestionDto.toDomain()`) keep
+the wire format out of the public model.
 
 **Facade.** The SDK has several moving parts (Retrofit service, DTOs, mappers, HTTP client,
 repository). The *facade* pattern hides them behind one simple, stable entry point,
