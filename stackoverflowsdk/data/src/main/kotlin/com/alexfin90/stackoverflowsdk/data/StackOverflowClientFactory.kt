@@ -1,7 +1,7 @@
 package com.alexfin90.stackoverflowsdk.data
 
 import com.alexfin90.stackoverflowsdk.data.di.NetworkModule
-import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
+import com.alexfin90.stackoverflowsdk.domain.StackOverflowClient
 import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
 
 /**
@@ -13,7 +13,7 @@ import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
  *
  * @param logger when not `null` every call is logged through it; `null` means no logging at all.
  */
-public fun createQuestionsRepository(
+public fun createStackOverflowClient(
     baseUrl: String,
     pageSize: Int,
     lastDays: Int,
@@ -21,12 +21,12 @@ public fun createQuestionsRepository(
     callTimeoutSeconds: Long = 30,
     logger: StackOverflowLogger? = null,
     nowEpochSeconds: () -> Long = { System.currentTimeMillis() / 1000 },
-): QuestionsRepository {
+): StackOverflowClient {
     val client = NetworkModule.provideOkHttpClient(connectTimeoutSeconds, callTimeoutSeconds)
     val retrofit = NetworkModule.provideRetrofit(baseUrl, client, NetworkModule.provideJson())
     val service = NetworkModule.provideService(retrofit)
     val remote = NetworkModule.provideRemoteDataSource(service)
-    val repository: QuestionsRepository =
-        QuestionsRepositoryImpl(remote, pageSize, lastDays, nowEpochSeconds)
-    return if (logger != null) LoggingQuestionsRepository(repository, logger) else repository
+    val sdkClient: StackOverflowClient =
+        StackOverflowClientImpl(remote, pageSize, lastDays, nowEpochSeconds)
+    return if (logger != null) LoggingStackOverflowClient(sdkClient, logger) else sdkClient
 }

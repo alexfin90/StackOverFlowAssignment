@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Networking layer: Retrofit service, DTOs, mappers and repository implementation.
+// Networking layer: Retrofit service, DTOs, mappers and the client implementation.
 // Consumed only by the :stackoverflowsdk facade, never directly by apps.
 //
 // NOTE: Retrofit/OkHttp are `implementation` on purpose. That hides them at compile time,

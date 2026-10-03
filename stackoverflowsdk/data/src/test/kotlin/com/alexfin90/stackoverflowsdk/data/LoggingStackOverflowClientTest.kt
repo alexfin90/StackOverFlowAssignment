@@ -2,7 +2,7 @@ package com.alexfin90.stackoverflowsdk.data
 
 import com.alexfin90.stackoverflowsdk.domain.LogLevel
 import com.alexfin90.stackoverflowsdk.domain.Question
-import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
+import com.alexfin90.stackoverflowsdk.domain.StackOverflowClient
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
 import kotlinx.coroutines.CancellationException
@@ -13,17 +13,17 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class LoggingQuestionsRepositoryTest {
+class LoggingStackOverflowClientTest {
 
     private val lines = mutableListOf<Pair<LogLevel, String>>()
     private val logger = StackOverflowLogger { level, message -> lines += level to message }
 
-    private class FakeDelegate(var result: () -> QuestionsResult) : QuestionsRepository {
+    private class FakeDelegate(var result: () -> QuestionsResult) : StackOverflowClient {
         override suspend fun getLatestQuestions(unansweredOnly: Boolean, page: Int) = result()
     }
 
-    private fun repository(delegate: QuestionsRepository, log: StackOverflowLogger = logger) =
-        LoggingQuestionsRepository(delegate, log, nanoTime = fakeClock())
+    private fun client(delegate: StackOverflowClient, log: StackOverflowLogger = logger) =
+        LoggingStackOverflowClient(delegate, log, nanoTime = fakeClock())
 
     // Each call to nanoTime advances 5 ms, so the logged duration is deterministic.
     private fun fakeClock(): () -> Long {
@@ -35,7 +35,7 @@ class LoggingQuestionsRepositoryTest {
 
     @Test
     fun `success is logged at debug with counts and duration, never with content`() = runTest {
-        val repo = repository(FakeDelegate { QuestionsResult.Success(listOf(secret), hasMore = true) })
+        val repo = client(FakeDelegate { QuestionsResult.Success(listOf(secret), hasMore = true) })
 
         val result = repo.getLatestQuestions(unansweredOnly = true, page = 2)
 
@@ -51,7 +51,7 @@ class LoggingQuestionsRepositoryTest {
 
     @Test
     fun `network error is logged as a warning without the exception message`() = runTest {
-        val repo = repository(FakeDelegate { QuestionsResult.NetworkError("Unable to resolve host x") })
+        val repo = client(FakeDelegate { QuestionsResult.NetworkError("Unable to resolve host x") })
 
         repo.getLatestQuestions()
 
@@ -63,7 +63,7 @@ class LoggingQuestionsRepositoryTest {
 
     @Test
     fun `api error is logged as an error with the http code`() = runTest {
-        val repo = repository(FakeDelegate { QuestionsResult.ApiError(400, "throttle_violation") })
+        val repo = client(FakeDelegate { QuestionsResult.ApiError(400, "throttle_violation") })
 
         repo.getLatestQuestions()
 
@@ -77,12 +77,12 @@ class LoggingQuestionsRepositoryTest {
     fun `the result is returned untouched`() = runTest {
         val expected = QuestionsResult.NetworkError("x")
 
-        assertSame(expected, repository(FakeDelegate { expected }).getLatestQuestions())
+        assertSame(expected, client(FakeDelegate { expected }).getLatestQuestions())
     }
 
     @Test
     fun `a throwing logger does not break the request`() = runTest {
-        val repo = repository(
+        val repo = client(
             FakeDelegate { QuestionsResult.Success(emptyList(), false) },
             log = { _, _ -> error("logger bug") },
         )
@@ -92,7 +92,7 @@ class LoggingQuestionsRepositoryTest {
 
     @Test
     fun `cancellation propagates and nothing is logged`() = runTest {
-        val repo = repository(FakeDelegate { throw CancellationException("cancelled") })
+        val repo = client(FakeDelegate { throw CancellationException("cancelled") })
 
         try {
             repo.getLatestQuestions()

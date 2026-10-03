@@ -3,7 +3,7 @@ package com.alexfin90.stackoverflowsdk.data
 import com.alexfin90.stackoverflowsdk.data.mapper.toDomain
 import com.alexfin90.stackoverflowsdk.data.remote.QuestionsRemoteDataSource
 import com.alexfin90.stackoverflowsdk.data.remote.RemoteResult
-import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
+import com.alexfin90.stackoverflowsdk.domain.StackOverflowClient
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import kotlinx.coroutines.CancellationException
 
@@ -11,12 +11,12 @@ import kotlinx.coroutines.CancellationException
  * Turns remote outcomes into the SDK's public results. It knows nothing about Retrofit, OkHttp
  * or HTTP exceptions: that is the job of the [QuestionsRemoteDataSource].
  */
-internal class QuestionsRepositoryImpl(
+internal class StackOverflowClientImpl(
     private val remote: QuestionsRemoteDataSource,
     private val pageSize: Int,
     private val lastDays: Int,
     private val nowEpochSeconds: () -> Long,
-) : QuestionsRepository {
+) : StackOverflowClient {
 
     override suspend fun getLatestQuestions(unansweredOnly: Boolean, page: Int): QuestionsResult {
         // The API filters with "fromdate" (Unix time, seconds): only questions created at

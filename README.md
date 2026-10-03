@@ -15,7 +15,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 ## Highlights
 
 - **SDK first**: the app only depends on one artifact, `:stackoverflowsdk`.
-- **Minimal public surface**: one entry point, one config class, one repository interface, one
+- **Minimal public surface**: one entry point, one config class, one client interface, one
   model and one result type. Everything else is `internal`.
 - **Never throws across the SDK boundary**: every failure is a `QuestionsResult` case.
 - **Explicit API mode** (`explicitApi()`): the compiler forces every public declaration to be
@@ -55,7 +55,7 @@ libraries, and the risk is contained:
 - Retrofit/OkHttp never appear in a public signature, so the exposure is limited to the runtime
   version resolution described above.
 - All network access sits behind a single internal service (`StackExchangeService`) and the
-  `QuestionsRepository` contract, so the HTTP stack can be replaced without touching consumers.
+  `StackOverflowClient` contract, so the HTTP stack can be replaced without touching consumers.
 - The facade module declares **no unnecessary dependencies** (no AppCompat, Material, ...).
 
 **What I would do in production** (not done here to keep the scope reasonable):
@@ -78,8 +78,8 @@ flowchart TD
     app[":app<br/>sample consumer"]
     sdk[":stackoverflowsdk<br/>facade: StackOverflowSdk"]
     api[":api<br/>StackOverflowConfig<br/>pure Kotlin/JVM"]
-    domain[":domain<br/>Question, QuestionsResult,<br/>QuestionsRepository<br/>pure Kotlin/JVM, no deps"]
-    data[":data<br/>Retrofit, DTOs, mapper,<br/>NetworkModule, repository impl<br/>Android library"]
+    domain[":domain<br/>Question, QuestionsResult,<br/>StackOverflowClient<br/>pure Kotlin/JVM, no deps"]
+    data[":data<br/>Retrofit, DTOs, mapper,<br/>NetworkModule, client impl<br/>Android library"]
 
     app -->|implementation| sdk
     sdk -->|api| api
@@ -100,14 +100,14 @@ the IMPORTANT note below is about.
 sequenceDiagram
     participant App as Host app
     participant Sdk as StackOverflowSdk
-    participant Repo as QuestionsRepositoryImpl
+    participant Repo as StackOverflowClientImpl
     participant Remote as RetrofitQuestionsRemoteDataSource
     participant Http as Retrofit / OkHttp
     participant So as Stack Exchange API
 
     App->>Sdk: initialize(config) once, warmUp() off the main thread
-    App->>Sdk: questionsRepository
-    Sdk-->>App: QuestionsRepository (shared, lazy)
+    App->>Sdk: client
+    Sdk-->>App: StackOverflowClient (shared, lazy)
     App->>Repo: getLatestQuestions(unansweredOnly, page)
     Note over Repo: fromdate = now - lastDays (seconds)
     Repo->>Remote: getLatestQuestions(fromDate, page, pageSize, unansweredOnly)
@@ -130,7 +130,7 @@ sequenceDiagram
 ### Error mapping
 
 Two steps, each with one responsibility. The data source is the only place that knows Retrofit's
-exceptions; the repository only knows `RemoteResult`.
+exceptions; `StackOverflowClientImpl` only knows `RemoteResult`.
 
 ```mermaid
 flowchart LR
@@ -149,12 +149,12 @@ flowchart LR
 Only the first case leaves the SDK as an exception, and it is handled by the coroutines runtime.
 
 - `:api` holds the public configuration (`StackOverflowConfig`), pure Kotlin/JVM.
-- `:domain` is pure Kotlin/JVM with **zero third-party dependencies**. The repository contract only
+- `:domain` is pure Kotlin/JVM with **zero third-party dependencies**. The client contract only
   uses `suspend`, so it does not even expose coroutines.
-- `:data` hides networking, in three small layers: `QuestionsRepositoryImpl` (public results) →
+- `:data` hides networking, in three small layers: `StackOverflowClientImpl` (public results) →
   `QuestionsRemoteDataSource` (an interface; transport failures as `RemoteResult`) → the Retrofit
-  service. The repository does not import Retrofit, so the HTTP stack can be swapped or faked
-  without touching it. Its only public symbol is `createQuestionsRepository()`.
+  service. The client does not import Retrofit, so the HTTP stack can be swapped or faked
+  without touching it. Its only public symbol is `createStackOverflowClient()`.
 - `:stackoverflowsdk` is the only module apps declare. It re-exports `:domain` with `api(...)`, so
   integrators get the models without declaring `:domain` themselves, and keeps `:data` as
   `implementation`, so integrators cannot see it.
@@ -163,16 +163,16 @@ Only the first case leaves the SDK as an exception, and it is handled by the cor
 
 > [!IMPORTANT]
 > **`:data` must stay `implementation` in `:stackoverflowsdk/build.gradle.kts`, never `api`.**
-> That single keyword is what keeps Retrofit, OkHttp, the DTOs and `createQuestionsRepository()`
+> That single keyword is what keeps Retrofit, OkHttp, the DTOs and `createStackOverflowClient()`
 > invisible to host apps. There is no opt-in marker or other safeguard behind it: if it were
 > changed to `api(...)`, they would silently become part of the public API (and a breaking change
 > every time they change). A comment in the build file warns about it, and a code review should
 > reject any change to this line.
 
-### Why is `createQuestionsRepository()` public?
+### Why is `createStackOverflowClient()` public?
 
 Kotlin's `internal` is scoped to a **Gradle module**, so the facade cannot see `internal`
-declarations of `:data`. The one symbol it needs, `createQuestionsRepository()`, must therefore be
+declarations of `:data`. The one symbol it needs, `createStackOverflowClient()`, must therefore be
 `public`. A host app still cannot reach it: `:stackoverflowsdk` declares `:data` with
 `implementation`, so the module is not on the app's compile classpath. The KDoc states that it is
 not part of the supported API.
@@ -184,22 +184,22 @@ not part of the supported API.
 ### Patterns: Facade and Singleton
 
 **Facade.** The SDK has several moving parts (Retrofit service, DTOs, mappers, HTTP client,
-repository). The *facade* pattern hides them behind one simple, stable entry point,
-`StackOverflowSdk`, which hands out a `QuestionsRepository`. The host app does not know what is
+data source). The *facade* pattern hides them behind one simple, stable entry point,
+`StackOverflowSdk`, which hands out a `StackOverflowClient`. The host app does not know what is
 behind it, so internals can change (even the whole HTTP stack) without breaking integrators. For an
 SDK this matters twice: it keeps the public surface minimal, and it gives one place to enforce
 rules (validated config, no exceptions across the boundary).
 
 **Singleton, with a conscious trade-off.** `StackOverflowSdk` is a Kotlin `object`: one well-known
 access point that needs no instance and no `Context`, which is how most SDKs are configured once at
-startup. Since `initialize` and the shared `questionsRepository` exist, **it now holds state**, and that has
+startup. Since `initialize` and the shared `client` exist, **it now holds state**, and that has
 a price: global mutable state is harder to test and allows one configuration per process. How it is
 contained:
 
-- The shared state is tiny (the configuration and one repository) and guarded by a lock.
+- The shared state is tiny (the configuration and one client) and guarded by a lock.
 - `initialize` is **once-only**: later or late calls are ignored (and return `false`), so a running
   SDK never changes underneath its callers.
-- Using the shared `questionsRepository` without `initialize` falls back to the defaults, it never throws.
+- Using the shared `client` without `initialize` falls back to the defaults, it never throws.
 - `create(config)` still returns an **independent instance** ignoring the shared state: use it in
   tests, for several configurations, or with your own DI container (the sample app does this
   through Hilt).
@@ -221,32 +221,32 @@ StackOverflowSdk.initialize(StackOverflowConfig(callTimeoutSeconds = 20, logging
 applicationScope.launch { StackOverflowSdk.warmUp() }
 
 // 3. Anywhere:
-when (val result = StackOverflowSdk.questionsRepository.getLatestQuestions(unansweredOnly = true, page = 1)) {
+when (val result = StackOverflowSdk.client.getLatestQuestions(unansweredOnly = true, page = 1)) {
     is QuestionsResult.Success      -> show(result.questions, canLoadMore = result.hasMore)
     is QuestionsResult.NetworkError -> showOffline(result.message)
     is QuestionsResult.ApiError     -> showError(result.httpCode, result.message)
 }
 ```
 
-`initialize` and `warmUp` are optional: `StackOverflowSdk.questionsRepository` works with the defaults. If you
+`initialize` and `warmUp` are optional: `StackOverflowSdk.client` works with the defaults. If you
 prefer to own the instance (tests, DI container, several configurations), use
 `StackOverflowSdk.create(config)` instead.
 
 | Type | Role |
 |---|---|
 | `StackOverflowSdk.initialize(config)` | Sets the configuration once. Cheap. Returns `true` if applied, `false` if ignored (already initialized or already in use). |
-| `StackOverflowSdk.questionsRepository` | Shared `QuestionsRepository`, built lazily and thread-safe. Uses the defaults if `initialize` was never called. |
-| `StackOverflowSdk.warmUp()` | Builds the shared repository now. Idempotent. Call it **off the main thread**: the SDK creates no threads of its own. |
-| `StackOverflowSdk.create(config)` | Independent repository, ignores `initialize`. Keep and reuse the instance. |
+| `StackOverflowSdk.client` | Shared `StackOverflowClient`, built lazily and thread-safe. Uses the defaults if `initialize` was never called. |
+| `StackOverflowSdk.warmUp()` | Builds the shared client now. Idempotent. Call it **off the main thread**: the SDK creates no threads of its own. |
+| `StackOverflowSdk.create(config)` | Independent client, ignores `initialize`. Keep and reuse the instance. |
 | `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30), `loggingEnabled` (false), `logger` (Logcat). Validated at construction. |
 | `StackOverflowLogger` / `LogLevel` | Optional sink for the SDK's log lines (`DEBUG`, `WARN`, `ERROR`). |
-| `QuestionsRepository` | `suspend fun getLatestQuestions(unansweredOnly, page): QuestionsResult` |
+| `StackOverflowClient` | `suspend fun getLatestQuestions(unansweredOnly, page): QuestionsResult` |
 | `QuestionsResult` | Sealed: `Success(questions, hasMore)` / `NetworkError` / `ApiError(httpCode?, message)` |
 | `Question` | Plain domain model, independent from the wire format. Title is already HTML-decoded. |
 
 ### Initialization rules
 
-1. **Only the first `initialize` takes effect**, and only if the shared repository was not used yet.
+1. **Only the first `initialize` takes effect**, and only if the shared client was not used yet.
    Any other call returns `false` and, if logging is enabled, logs a warning. The configuration of a
    running SDK never changes.
 2. **Using the SDK without `initialize` is safe**: the defaults apply, nothing throws. The first
@@ -278,8 +278,8 @@ One line per request, for example
   server content). This is covered by a test.
 - **A faulty logger cannot break the SDK**: an exception thrown by `StackOverflowLogger.log` is
   swallowed.
-- Implemented as a decorator (`LoggingQuestionsRepository`) that is only created when logging is
-  enabled, so the default path pays nothing and the repository stays free of logging code.
+- Implemented as a decorator (`LoggingStackOverflowClient`) that is only created when logging is
+  enabled, so the default path pays nothing and the client implementation stays free of logging code.
 
 ### Coroutine cancellation
 
@@ -298,7 +298,7 @@ leave the SDK.
 
 - **Errors are values, not exceptions.** An exception thrown by the SDK would show up as a crash of
   the *host* app. The data source catches everything (including the unexpected) and turns it into
-  a `RemoteResult`; the repository maps that to a `QuestionsResult`. The only exception rethrown is
+  a `RemoteResult`; `StackOverflowClientImpl` maps that to a `QuestionsResult`. The only exception rethrown is
   `CancellationException`, to respect structured concurrency.
 - **No `Context`; initialization is optional and non-blocking.** `initialize` only stores a
   validated configuration, so nothing blocks the host's startup or leaks an `Activity`.
@@ -308,7 +308,7 @@ leave the SDK.
   done by the server and pagination stays correct.
 - **No DI framework inside the SDK.** Hilt/Dagger would be imposed on the host (annotation
   processing, application class, version conflicts). Testability comes from plain constructor
-  injection (`QuestionsRepositoryImpl` receives its data source, the data source receives the service). Hilt is a good fit for the *sample
+  injection (`StackOverflowClientImpl` receives its data source, the data source receives the service). Hilt is a good fit for the *sample
   app*, where it will be used.
 - **Timeouts are explicit.** Connect timeout (default 10 s) makes the SDK fail fast on a dead
   network; call timeout (default 30 s) caps the whole request. A timeout is an `IOException`, so it
@@ -358,8 +358,8 @@ StackOverFlow Home Assignment
 ├── app                       # Sample consumer app (Compose)
 └── stackoverflowsdk          # Facade (Android library): StackOverflowSdk
     ├── api                   # Public configuration: StackOverflowConfig (pure JVM)
-    ├── domain                # Question, QuestionsResult, QuestionsRepository (pure JVM)
-    └── data                  # Retrofit service, DTOs, mapper, repository impl (Android library)
+    ├── domain                # Question, QuestionsResult, StackOverflowClient (pure JVM)
+    └── data                  # Retrofit service, DTOs, mapper, client impl (Android library)
 ```
 
 ---
@@ -400,7 +400,7 @@ StackOverFlow Home Assignment
 - **Remote data source** (against `MockWebServer`): endpoint and query parameters (30-day window,
   paging, `no-answers` for the filter), unknown fields ignored, HTTP error, malformed body,
   connection failure, unknown host.
-- **Repository** (against a fake data source, no HTTP): DTO to domain mapping, the `fromdate` window
+- **Client implementation** (against a fake data source, no HTTP): DTO to domain mapping, the `fromdate` window
   and the parameters passed down, every failure kind mapped to the right result.
 - **Wiring**: three end-to-end cases through the public factory.
 - **Logging decorator**: exact line format, levels, no content in the lines, a throwing logger and a
@@ -420,7 +420,7 @@ an emulator. It is declared with `testImplementation`, so **it is never shipped 
 
 It is a common need in apps too (for example a ViewModel using `SavedStateHandle`, which relies on
 `Bundle`). Here it is needed because the mapper uses `Html.fromHtml` to decode HTML entities in
-titles, and the repository tests go through the mapper.
+titles, and the client tests go through the mapper.
 
 > [!NOTE]
 > **Trade-off:** `Html.fromHtml` is more complete than a hand-written decoder, but it makes every
@@ -437,8 +437,8 @@ titles, and the repository tests go through the mapper.
 Work is delivered step by step through pull requests.
 
 - [x] Module structure (facade, domain, data), explicit API mode
-- [x] Domain models, result type and repository contract
-- [x] Data layer: Retrofit service, DTOs, mapper, repository, tests
+- [x] Domain models, result type and client contract
+- [x] Data layer: Retrofit service, DTOs, mapper, client, tests
 - [x] Facade (`StackOverflowSdk`, `StackOverflowConfig`) and README
 - [ ] Sample app: list screen with "unanswered" filter and loading state, detail screen
       (Compose, ViewModel, Hilt)

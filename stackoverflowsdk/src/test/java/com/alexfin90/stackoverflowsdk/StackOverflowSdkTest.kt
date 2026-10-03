@@ -29,7 +29,7 @@ class StackOverflowSdkTest {
     }
 
     @Test
-    fun `create does no io and returns a repository`() {
+    fun `create does no io and returns a client`() {
         assertNotNull(StackOverflowSdk.create())
     }
 
@@ -39,13 +39,13 @@ class StackOverflowSdkTest {
     }
 
     @Test
-    fun `repository without initialize uses the defaults and does not throw`() {
-        assertNotNull(StackOverflowSdk.questionsRepository)
+    fun `client without initialize uses the defaults and does not throw`() {
+        assertNotNull(StackOverflowSdk.client)
     }
 
     @Test
-    fun `repository is a single shared instance`() {
-        assertSame(StackOverflowSdk.questionsRepository, StackOverflowSdk.questionsRepository)
+    fun `client is a single shared instance`() {
+        assertSame(StackOverflowSdk.client, StackOverflowSdk.client)
     }
 
     @Test
@@ -61,8 +61,8 @@ class StackOverflowSdkTest {
     }
 
     @Test
-    fun `initialize after the repository was used is ignored`() {
-        StackOverflowSdk.questionsRepository
+    fun `initialize after the client was used is ignored`() {
+        StackOverflowSdk.client
 
         assertFalse(StackOverflowSdk.initialize(StackOverflowConfig(pageSize = 10)))
     }
@@ -100,10 +100,10 @@ class StackOverflowSdkTest {
     @Test
     fun `warmUp is idempotent and builds the shared instance`() {
         StackOverflowSdk.warmUp()
-        val first = StackOverflowSdk.questionsRepository
+        val first = StackOverflowSdk.client
         StackOverflowSdk.warmUp()
 
-        assertSame(first, StackOverflowSdk.questionsRepository)
+        assertSame(first, StackOverflowSdk.client)
     }
 
     @Test
@@ -113,7 +113,7 @@ class StackOverflowSdkTest {
         val futures = (1..8).map {
             executor.submit<Any> {
                 start.await()
-                StackOverflowSdk.questionsRepository
+                StackOverflowSdk.client
             }
         }
         start.countDown()

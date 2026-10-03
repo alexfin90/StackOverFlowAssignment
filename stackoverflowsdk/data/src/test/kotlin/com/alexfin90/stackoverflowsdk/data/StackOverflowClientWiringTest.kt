@@ -1,6 +1,6 @@
 package com.alexfin90.stackoverflowsdk.data
 
-import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
+import com.alexfin90.stackoverflowsdk.domain.StackOverflowClient
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
@@ -17,18 +17,18 @@ import org.robolectric.RobolectricTestRunner
 
 /**
  * End to end through the public factory (real Retrofit + MockWebServer) to guard the wiring.
- * The detailed behaviour is covered by the data source and repository tests.
+ * The detailed behaviour is covered by the data source and client tests.
  */
 @RunWith(RobolectricTestRunner::class)
-class QuestionsRepositoryWiringTest {
+class StackOverflowClientWiringTest {
 
     private val server = MockWebServer()
-    private lateinit var repository: QuestionsRepository
+    private lateinit var client: StackOverflowClient
 
     @Before
     fun setUp() {
         server.start()
-        repository = createQuestionsRepository(
+        client = createStackOverflowClient(
             baseUrl = server.url("/").toString(),
             pageSize = 20,
             lastDays = 30,
@@ -57,7 +57,7 @@ class QuestionsRepositoryWiringTest {
     fun `success is mapped to domain questions`() = runTest {
         server.enqueue(json(twoQuestions))
 
-        val result = repository.getLatestQuestions()
+        val result = client.getLatestQuestions()
 
         assertTrue(result is QuestionsResult.Success)
         result as QuestionsResult.Success
@@ -70,7 +70,7 @@ class QuestionsRepositoryWiringTest {
     fun `unanswered filter hits the no-answers endpoint`() = runTest {
         server.enqueue(json("""{"items":[],"has_more":false}"""))
 
-        val result = repository.getLatestQuestions(unansweredOnly = true)
+        val result = client.getLatestQuestions(unansweredOnly = true)
 
         assertEquals("/2.3/questions/no-answers", server.takeRequest().requestUrl!!.encodedPath)
         assertTrue((result as QuestionsResult.Success).questions.isEmpty())
@@ -81,6 +81,6 @@ class QuestionsRepositoryWiringTest {
     fun `connection failure maps to NetworkError`() = runTest {
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
 
-        assertTrue(repository.getLatestQuestions() is QuestionsResult.NetworkError)
+        assertTrue(client.getLatestQuestions() is QuestionsResult.NetworkError)
     }
 }

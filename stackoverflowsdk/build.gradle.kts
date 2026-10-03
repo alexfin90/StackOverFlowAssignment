@@ -32,7 +32,7 @@ dependencies {
     api(project(":stackoverflowsdk:domain"))
 
     // IMPORTANT: keep `implementation`, never `api`. This is what hides :data (Retrofit, OkHttp,
-    // DTOs, createQuestionsRepository) from host apps. With `api` they would become visible
+    // DTOs, createStackOverflowClient) from host apps. With `api` they would become visible
     // and part of the public API. See README, "Architecture".
     implementation(project(":stackoverflowsdk:data"))
     testImplementation(libs.junit)

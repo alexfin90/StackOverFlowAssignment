@@ -1,7 +1,7 @@
 package com.alexfin90.stackoverflowhomeassignment.di
 
 import com.alexfin90.stackoverflowsdk.StackOverflowSdk
-import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
+import com.alexfin90.stackoverflowsdk.domain.StackOverflowClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -15,5 +15,5 @@ object SdkModule {
 
     @Provides
     @Singleton
-    fun provideQuestionsRepository(): QuestionsRepository = StackOverflowSdk.questionsRepository
+    fun provideStackOverflowClient(): StackOverflowClient = StackOverflowSdk.client
 }

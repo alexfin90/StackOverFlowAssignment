@@ -1,19 +1,19 @@
 package com.alexfin90.stackoverflowsdk.data
 
 import com.alexfin90.stackoverflowsdk.domain.LogLevel
-import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
+import com.alexfin90.stackoverflowsdk.domain.StackOverflowClient
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
 
 /**
- * Decorator that logs one line per call and delegates everything else: the repository itself
+ * Decorator that logs one line per call and delegates everything else: the client itself
  * stays free of logging. Only created when logging is enabled, so the default path pays nothing.
  */
-internal class LoggingQuestionsRepository(
-    private val delegate: QuestionsRepository,
+internal class LoggingStackOverflowClient(
+    private val delegate: StackOverflowClient,
     private val logger: StackOverflowLogger,
     private val nanoTime: () -> Long = System::nanoTime,
-) : QuestionsRepository {
+) : StackOverflowClient {
 
     override suspend fun getLatestQuestions(unansweredOnly: Boolean, page: Int): QuestionsResult {
         val start = nanoTime()

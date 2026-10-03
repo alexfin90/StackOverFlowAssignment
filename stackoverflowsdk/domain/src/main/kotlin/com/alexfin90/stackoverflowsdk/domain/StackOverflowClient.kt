@@ -1,7 +1,7 @@
 package com.alexfin90.stackoverflowsdk.domain
 
 /** Entry point for reading StackOverflow questions. Implementations never throw. */
-public interface QuestionsRepository {
+public interface StackOverflowClient {
 
     /**
      * Questions created in the configured time window, newest first.
