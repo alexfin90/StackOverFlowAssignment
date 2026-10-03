@@ -1,15 +1,20 @@
 package com.alexfin90.stackoverflowsdk.data.remote
 
 import com.alexfin90.stackoverflowsdk.data.di.NetworkModule
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 
 /** Transport behaviour: requests sent and exceptions translated, against a real HTTP stack. */
 class RetrofitQuestionsRemoteDataSourceTest {
@@ -129,5 +134,21 @@ class RetrofitQuestionsRemoteDataSourceTest {
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
 
         assertTrue(remote.getQuestion(1) is RemoteResult.Failure.Network)
+    }
+
+    @Test
+    fun `cancelling a slow call is not turned into a result and does not crash`() = runTest {
+        // The server accepts the request and never answers, so the call is in flight until cancelled.
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        var returned: RemoteResult<*>? = null
+
+        val job = launch(Dispatchers.IO) { returned = latest() }
+        server.takeRequest(5, TimeUnit.SECONDS) // the request is really in flight
+        job.cancelAndJoin()
+
+        // If the cancellation had been swallowed, `returned` would be a Failure.Unexpected.
+        assertNull(returned)
+        assertTrue(job.isCancelled)
+        // runTest also fails on any uncaught exception, so reaching this line means no crash.
     }
 }
