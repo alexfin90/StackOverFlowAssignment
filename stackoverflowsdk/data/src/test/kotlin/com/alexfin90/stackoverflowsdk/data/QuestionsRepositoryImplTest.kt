@@ -12,10 +12,13 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import com.alexfin90.stackoverflowsdk.domain.InternalStackOverflowApi
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 
 @OptIn(InternalStackOverflowApi::class)
+@RunWith(RobolectricTestRunner::class)
 class QuestionsRepositoryImplTest {
 
     private val server = MockWebServer()
@@ -118,5 +121,16 @@ class QuestionsRepositoryImplTest {
 
         assertTrue(result is QuestionsResult.NetworkError)
         assertNotNull(result)
+    }
+
+    @Test
+    fun `unknown host maps to NetworkError`() = runTest {
+        val offline = createQuestionsRepository(
+            baseUrl = "http://nonexistent.invalid/",
+            pageSize = 20,
+            lastDays = 30,
+        )
+
+        assertTrue(offline.getLatestQuestions() is QuestionsResult.NetworkError)
     }
 }
