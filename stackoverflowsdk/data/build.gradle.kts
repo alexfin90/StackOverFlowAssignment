@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -11,18 +11,34 @@ plugins {
 // conflicts").
 kotlin {
     explicitApi()
-    // Pins Java and Kotlin compilation to JDK 17 (auto-provisioned via foojay if missing).
     jvmToolchain(17)
+}
+
+android {
+    namespace = "com.alexfin90.stackoverflowsdk.data"
+    compileSdk {
+        version = release(37)
+    }
+
+    defaultConfig {
+        minSdk = 24
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
     api(project(":stackoverflowsdk:domain"))
     implementation(libs.retrofit)
+    implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
 }

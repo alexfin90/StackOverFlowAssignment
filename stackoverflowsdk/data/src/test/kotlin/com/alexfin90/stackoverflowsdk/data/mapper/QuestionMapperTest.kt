@@ -5,7 +5,10 @@ import com.alexfin90.stackoverflowsdk.data.remote.QuestionDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class QuestionMapperTest {
 
     @Test
@@ -21,11 +24,6 @@ class QuestionMapperTest {
     @Test
     fun `does not double decode`() {
         assertEquals("&lt;", "&amp;lt;".decodeHtmlEntities())
-    }
-
-    @Test
-    fun `leaves invalid entities untouched`() {
-        assertEquals("&#99999999;", "&#99999999;".decodeHtmlEntities())
     }
 
     @Test

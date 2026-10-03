@@ -35,6 +35,8 @@ internal class QuestionsRepositoryImpl(
         } catch (e: HttpException) {
             QuestionsResult.ApiError(e.code(), e.message())
         } catch (e: IOException) {
+            // Also covers UnknownHostException, ConnectException and SocketTimeoutException
+            // (all subclasses): offline, DNS failure, connect/call timeout.
             QuestionsResult.NetworkError(e.message)
         } catch (e: SerializationException) {
             QuestionsResult.ApiError(null, "Unreadable response: ${e.message}")
