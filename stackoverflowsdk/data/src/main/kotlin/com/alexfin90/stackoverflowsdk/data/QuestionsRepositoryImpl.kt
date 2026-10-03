@@ -1,80 +1,68 @@
 package com.alexfin90.stackoverflowsdk.data
 
 import com.alexfin90.stackoverflowsdk.data.mapper.toDomain
-import com.alexfin90.stackoverflowsdk.data.remote.StackExchangeService
+import com.alexfin90.stackoverflowsdk.data.remote.QuestionsRemoteDataSource
+import com.alexfin90.stackoverflowsdk.data.remote.RemoteResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.SerializationException
-import retrofit2.HttpException
-import java.io.IOException
 
+/**
+ * Turns remote outcomes into the SDK's public results. It knows nothing about Retrofit, OkHttp
+ * or HTTP exceptions: that is the job of the [QuestionsRemoteDataSource].
+ */
 internal class QuestionsRepositoryImpl(
-    private val service: StackExchangeService,
+    private val remote: QuestionsRemoteDataSource,
     private val pageSize: Int,
     private val lastDays: Int,
     private val nowEpochSeconds: () -> Long,
 ) : QuestionsRepository {
 
-    override suspend fun getLatestQuestions(unansweredOnly: Boolean, page: Int): QuestionsResult =
-        call(
-            request = {
-                // The API filters with "fromdate" (Unix time, seconds): only questions created at
-                // or after it are returned. "Last N days" is therefore now minus N days in seconds.
-                // Recomputed on every call, so the window slides slightly between pages.
-                val fromDate = nowEpochSeconds() - lastDays * SECONDS_PER_DAY
-                if (unansweredOnly) {
-                    service.unansweredQuestions(fromDate, page, pageSize)
-                } else {
-                    service.latestQuestions(fromDate, page, pageSize)
-                }
-            },
-            onSuccess = { response ->
-                QuestionsResult.Success(response.items.map { it.toDomain() }, response.hasMore)
-            },
-            onNetworkError = QuestionsResult::NetworkError,
-            onApiError = QuestionsResult::ApiError,
-        )
+    override suspend fun getLatestQuestions(unansweredOnly: Boolean, page: Int): QuestionsResult {
+        // The API filters with "fromdate" (Unix time, seconds): only questions created at
+        // or after it are returned. "Last N days" is therefore now minus N days in seconds.
+        // Recomputed on every call, so the window slides slightly between pages.
+        val fromDate = nowEpochSeconds() - lastDays * SECONDS_PER_DAY
+        return when (val result = remote.getLatestQuestions(fromDate, page, pageSize, unansweredOnly)) {
+            is RemoteResult.Success -> mapSuccess(result)
+            is RemoteResult.Failure.Network -> QuestionsResult.NetworkError(result.message)
+            is RemoteResult.Failure.Http -> QuestionsResult.ApiError(result.code, result.message)
+            is RemoteResult.Failure.Malformed ->
+                QuestionsResult.ApiError(null, "Unreadable response: ${result.message}")
+            is RemoteResult.Failure.Unexpected -> QuestionsResult.ApiError(null, result.message)
+        }
+    }
 
     override suspend fun getQuestion(id: Long): QuestionResult =
-        call(
-            request = { service.question(id) },
-            onSuccess = { response ->
-                response.items.firstOrNull()?.let { QuestionResult.Success(it.toDomain()) }
-                    ?: QuestionResult.NotFound
-            },
-            onNetworkError = QuestionResult::NetworkError,
-            onApiError = QuestionResult::ApiError,
-        )
+        when (val result = remote.getQuestion(id)) {
+            is RemoteResult.Success -> mapQuestion(result)
+            is RemoteResult.Failure.Network -> QuestionResult.NetworkError(result.message)
+            is RemoteResult.Failure.Http -> QuestionResult.ApiError(result.code, result.message)
+            is RemoteResult.Failure.Malformed ->
+                QuestionResult.ApiError(null, "Unreadable response: ${result.message}")
+            is RemoteResult.Failure.Unexpected -> QuestionResult.ApiError(null, result.message)
+        }
 
-    /**
-     * Single place that turns every failure into a value, so nothing is thrown across the SDK
-     * boundary and the host app cannot crash because of us.
-     */
-    private suspend fun <T, R> call(
-        request: suspend () -> T,
-        onSuccess: (T) -> R,
-        onNetworkError: (String?) -> R,
-        onApiError: (Int?, String) -> R,
-    ): R =
+    private fun mapQuestion(result: RemoteResult.Success<com.alexfin90.stackoverflowsdk.data.remote.QuestionsResponseDto>): QuestionResult =
         try {
-            onSuccess(request())
+            result.value.items.firstOrNull()?.let { QuestionResult.Success(it.toDomain()) }
+                ?: QuestionResult.NotFound
         } catch (e: CancellationException) {
-            // Coroutine cancellation is signalled with this exception: swallowing it would keep
-            // a cancelled coroutine running. The coroutines runtime handles it, it never crashes the host.
             throw e
-        } catch (e: HttpException) {
-            onApiError(e.code(), e.message())
-        } catch (e: IOException) {
-            // Also covers UnknownHostException, ConnectException and SocketTimeoutException
-            // (all subclasses): offline, DNS failure, connect/call timeout.
-            onNetworkError(e.message)
-        } catch (e: SerializationException) {
-            onApiError(null, "Unreadable response: ${e.message}")
         } catch (e: Exception) {
-            // Last line of defence: an unexpected bug must not crash the host app.
-            onApiError(null, e.message ?: e.javaClass.simpleName)
+            // Mapping bug: report it as a value, never crash the host.
+            QuestionResult.ApiError(null, e.message ?: e.javaClass.simpleName)
+        }
+
+    private fun mapSuccess(result: RemoteResult.Success<com.alexfin90.stackoverflowsdk.data.remote.QuestionsResponseDto>): QuestionsResult =
+        try {
+            QuestionsResult.Success(result.value.items.map { it.toDomain() }, result.value.hasMore)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Mapping bug: report it as a value, never crash the host.
+            QuestionsResult.ApiError(null, e.message ?: e.javaClass.simpleName)
         }
 
     private companion object {
