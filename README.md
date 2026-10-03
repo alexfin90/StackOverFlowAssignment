@@ -98,8 +98,35 @@ libraries, and the risk is contained:
 Kotlin's `internal` is scoped to a **Gradle module**, so the facade cannot see `internal`
 declarations of `:data`. The one symbol it needs, `createQuestionsRepository()`, must therefore be
 `public`. It is annotated with `@InternalStackOverflowApi` (`@RequiresOptIn`, level `ERROR`): the
-facade opts in explicitly, while a host app calling it directly gets a **compile error**. It is
-public for technical reasons only and is not part of the supported API.
+facade opts in explicitly, while any other caller gets a **compile error**.
+
+There are two layers of protection:
+
+1. `:stackoverflowsdk` declares `:data` with `implementation`, so a host app does not even see the
+   module on its compile classpath.
+2. If `:data` were ever exposed (an `api(...)` by mistake, or published as a separate artifact),
+   the opt-in marker still prevents accidental use and states the intent: the symbol is public for
+   technical reasons only and is **not** part of the supported API.
+
+### Patterns: Facade and Singleton
+
+**Facade.** The SDK has several moving parts (Retrofit service, DTOs, mappers, HTTP client,
+repository). The *facade* pattern hides them behind one simple, stable entry point:
+`StackOverflowSdk.create(config)`, which returns a `QuestionsRepository`. The host app does not
+know what is behind it, so internals can change (even the whole HTTP stack) without breaking
+integrators. For an SDK this matters twice: it keeps the public surface minimal, and it gives one
+place to enforce rules (validated config, no exceptions across the boundary).
+
+**Singleton.** `StackOverflowSdk` is a Kotlin `object`, i.e. a singleton used as the entry point:
+one well-known, always available access point that needs no instance and no `Context`. A common
+SDK practice is also to build the expensive objects (the HTTP client and its connection pool) once
+and reuse them. Two conscious choices here:
+
+- The `object` is **stateless**: it only creates repositories. Global mutable state in a singleton
+  hurts testability and makes it impossible to have two configurations in the same process.
+- The *repository* is **not** forced to be a singleton: `create()` returns a new instance and the
+  caller keeps it (typically one per app, provided through DI in the sample app). This keeps tests
+  isolated and the SDK free of hidden global state.
 
 ---
 
@@ -244,6 +271,26 @@ StackOverFlow Home Assignment
   (30-day window, paging, `no-answers` for the filter), HTTP error, malformed body, connection
   failure.
 - **Config**: defaults and validation.
+
+### Why Robolectric?
+
+Plain JVM unit tests run against `android.jar`, whose framework classes are **stubs**: calling them
+fails with `Method ... not mocked`. [Robolectric](https://robolectric.org) is a test runner
+(`@RunWith(RobolectricTestRunner::class)`) that replaces those stubs with real implementations of
+the Android framework, so code that needs `Context`, `Bundle`, `Html`, ... runs on the JVM without
+an emulator. It is declared with `testImplementation`, so **it is never shipped with the SDK**.
+
+It is a common need in apps too (for example a ViewModel using `SavedStateHandle`, which relies on
+`Bundle`). Here it is needed because the mapper uses `Html.fromHtml` to decode HTML entities in
+titles, and the repository tests go through the mapper.
+
+> [!NOTE]
+> **Trade-off:** `Html.fromHtml` is more complete than a hand-written decoder, but it makes every
+> test that touches the mapper run under Robolectric. Cost: slower test runs (about 37 s for the
+> first run on my machine, as Robolectric downloads the Android jars) and network access on the
+> very first run on a new machine. If this becomes a problem, the alternative is a small
+> hand-written decoder in pure Kotlin (only the few entities the API emits), which lets `:data`
+> go back to being a plain JVM module with plain JUnit tests.
 
 ---
 
