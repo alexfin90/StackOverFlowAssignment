@@ -18,6 +18,9 @@ internal class QuestionsRepositoryImpl(
 
     override suspend fun getLatestQuestions(unansweredOnly: Boolean, page: Int): QuestionsResult =
         try {
+            // The API filters with "fromdate" (Unix time, seconds): only questions created at
+            // or after it are returned. "Last N days" is therefore now minus N days in seconds.
+            // Recomputed on every call, so the window slides slightly between pages.
             val fromDate = nowEpochSeconds() - lastDays * SECONDS_PER_DAY
             val response = if (unansweredOnly) {
                 service.unansweredQuestions(fromDate, page, pageSize)
@@ -26,7 +29,9 @@ internal class QuestionsRepositoryImpl(
             }
             QuestionsResult.Success(response.items.map { it.toDomain() }, response.hasMore)
         } catch (e: CancellationException) {
-            throw e // structured concurrency: cancellation is not an error
+            // Coroutine cancellation is signalled with this exception: swallowing it would keep
+            // a cancelled coroutine running. The coroutines runtime handles it, it never crashes the host.
+            throw e
         } catch (e: HttpException) {
             QuestionsResult.ApiError(e.code(), e.message())
         } catch (e: IOException) {
@@ -34,11 +39,11 @@ internal class QuestionsRepositoryImpl(
         } catch (e: SerializationException) {
             QuestionsResult.ApiError(null, "Unreadable response: ${e.message}")
         } catch (e: Exception) {
-            // Last line of defence: nothing may cross the SDK boundary and crash the host.
+            // Last line of defence: an unexpected bug must not crash the host app.
             QuestionsResult.ApiError(null, e.message ?: e.javaClass.simpleName)
         }
 
     private companion object {
-        const val SECONDS_PER_DAY = 86_400L
+        const val SECONDS_PER_DAY = 86_400L // 24 * 60 * 60
     }
 }
