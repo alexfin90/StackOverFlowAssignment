@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -32,6 +34,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true // BuildConfig.DEBUG for StrictMode
     }
 }
 
@@ -53,4 +56,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(project(":stackoverflowsdk"))
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(project(":core:dispatcher"))
+    implementation(libs.timber)
 }
