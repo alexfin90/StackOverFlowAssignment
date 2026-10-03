@@ -9,8 +9,9 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 
 > **Status.** The SDK (`:stackoverflowsdk` + `:api` + `:domain` + `:data`) and the sample app
 > (list with "unanswered" filter, detail screen, deep link, `mock`/`real` flavors) are implemented,
-> with 52 unit/UI tests. The app was verified through tests and builds, **not run on a device or
-> emulator** in the environment where it was written, see [Known limitations](#known-limitations).
+> with 52 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
+> flavor, detail through the deep link on `mock`), but **not on a physical device**, see
+> [Known limitations](#known-limitations).
 
 ---
 
@@ -336,14 +337,40 @@ The flavor is chosen at build time; each one has its own Hilt `SdkModule` in `sr
 
 ### Deep link
 
+`stackoverflowdemo://question/{questionId}` opens the detail screen directly. It is declared twice,
+as usual: a manifest `intent-filter` (`VIEW`, `BROWSABLE`) and a type-safe
+`navDeepLink<Route.QuestionDetail>`. It works because the detail loads **by id**
+(`getQuestion(id)` in the SDK): a link carries an id, not a question.
+
+**Try it (emulator or device with USB debugging):**
+
+1. Install the app: `./gradlew :app:installMockDebug` (or `:app:installRealDebug`).
+2. Fire the link with `adb`. On macOS `adb` is in `~/Library/Android/sdk/platform-tools/` if it is
+   not on your `PATH`.
+
 ```bash
-adb shell am start -a android.intent.action.VIEW -d "stackoverflowdemo://question/1000"
+# mock flavor: ids 1000..1019 exist, works offline
+adb shell am start -a android.intent.action.VIEW \
+  -d "stackoverflowdemo://question/1000" \
+  -p com.alexfin90.stackoverflowhomeassignment.mock
+
+# real flavor: use any StackOverflow question id, e.g. the number in a question URL
+adb shell am start -a android.intent.action.VIEW \
+  -d "stackoverflowdemo://question/80007692" \
+  -p com.alexfin90.stackoverflowhomeassignment
 ```
 
-Ids `1000` to `1019` exist in the `mock` flavor, so the link can be tried offline. In `real`, use
-any real StackOverflow question id. It is declared twice, as usual: a manifest `intent-filter`
-(`VIEW`, `BROWSABLE`) and a type-safe `navDeepLink<Route.QuestionDetail>`. It works because the
-detail loads **by id** (`getQuestion(id)` in the SDK): a link carries an id, not a question.
+- `-p <package>` selects the app. **Both flavors register the same link**, so if both are installed
+  and you omit `-p`, Android shows an app chooser. That is expected.
+- Expected result: the detail screen of that question (title, author, answers, tags, "Open in
+  browser"). An id that does not exist shows the "does not exist" state, a missing network shows
+  the error state with **Retry**.
+- To check that the link is registered: `adb shell pm query-activities --brief -a
+  android.intent.action.VIEW -d "stackoverflowdemo://question/1000"` lists the matching apps.
+- Pressing Back after opening the link directly leaves the app (the graph is flat, see
+  [Known limitations](#known-limitations)).
+
+---
 
 ### Compose and architecture practices
 
@@ -493,8 +520,12 @@ Delivered step by step through stacked pull requests.
 
 ## Known limitations
 
-- The app was **not run on a device or emulator** while writing it; behaviour is verified by 52
-  tests and by building the `mock` and `real` variants. A manual run is the first thing to do.
+- Manual checks were limited to an emulator: the list with real data and the detail through the
+  deep link on `mock`. Not tried on a physical device. The rest of the behaviour is covered by 52
+  tests (UI tests run on the JVM, see [Testing](#testing)).
+- "Open in browser" opens the `link` returned by the API. If `stackoverflow.com` blocks your
+  network (it can answer 403/503 to some shared IPs, e.g. hotels), the browser shows that error:
+  it is not an app issue.
 - The `fromdate` window slides between pages, so a question at the edge can appear twice (the app
   de-duplicates by id) or be skipped.
 - Anonymous Stack Exchange requests have a small shared quota; when it is exhausted the app shows
