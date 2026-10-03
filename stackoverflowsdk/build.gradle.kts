@@ -19,20 +19,21 @@ android {
 
     defaultConfig {
         minSdk = 24
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
 }
 
 dependencies {
-    // Facade: re-exports the domain API; data stays an implementation detail.
+    // Deliberately no appcompat/material/core-ktx: every dependency of an SDK ends up in the
+    // host app, so we only declare what the code needs.
+    // Public part, re-exported so host apps get StackOverflowConfig and the domain types
+    // by depending on this module only.
+    api(project(":stackoverflowsdk:api"))
     api(project(":stackoverflowsdk:domain"))
+
+    // IMPORTANT: keep `implementation`, never `api`. This is what hides :data (Retrofit, OkHttp,
+    // DTOs, createQuestionsRepository) from host apps. With `api` they would become visible
+    // and part of the public API. See README, "Architecture".
     implementation(project(":stackoverflowsdk:data"))
-    implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.material)
     testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
 }
