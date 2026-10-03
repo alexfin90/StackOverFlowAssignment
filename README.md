@@ -7,7 +7,7 @@ The assignment asks for an app listing the latest StackOverflow questions, with 
 filter and a detail view, where **the retrieval logic is extracted into a library module** that any
 app can reuse. This project puts the weight on that library: a small, stable, hard-to-misuse SDK.
 
-> **Status.** The SDK (`:stackoverflowsdk` + `:domain` + `:data`) is implemented and tested. The
+> **Status.** The SDK (`:stackoverflowsdk` + `:api` + `:domain` + `:data`) is implemented and tested. The
 > sample app screens are in progress, see [Roadmap](#roadmap).
 
 ---
@@ -21,7 +21,9 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 - **Explicit API mode** (`explicitApi()`): the compiler forces every public declaration to be
   deliberate.
 - **Multi-module Gradle project**, no convention plugins (kept simple on purpose for a small project).
-- **Unit tests** with `MockWebServer` for the networking layer.
+- **Explicit timeouts** and **coroutine-cancellation aware**: slow or missing networks fail fast
+  as `NetworkError`, cancelled requests stop cleanly.
+- **Unit tests**: `MockWebServer` + Robolectric for the networking layer, plain JUnit elsewhere.
 
 ---
 
@@ -74,14 +76,15 @@ libraries, and the risk is contained:
 ┌──────────────────────── :stackoverflowsdk ───────────────────────┐
 │  Facade: StackOverflowSdk                                        │
 │  api → :api, :domain      implementation → :data                 │
-└───────────────┬──────────────────────────────────┬───────────────┘
-                │ api                              │ implementation
-                ▼                                  ▼
-┌──────────── :domain ────────────┐   ┌──────────── :data ─────────────┐
-│ Question, QuestionsResult,      │◄──│ Retrofit service, DTOs, mapper,│
-│ QuestionsRepository             │   │ QuestionsRepositoryImpl        │
-│ (pure Kotlin/JVM, no deps)      │   │ (Android library)              │
-└─────────────────────────────────┘   └────────────────────────────────┘
+└───────┬─────────────────────────┬────────────────────┬───────────┘
+        │ api                     │ api                │ implementation
+        ▼                         ▼                    ▼
+┌─── :api ────────┐  ┌──── :domain ────────┐  ┌──────── :data ────────────┐
+│ Stack Overflow  │  │ Question,           │◄─│ Retrofit service, DTOs,   │
+│ Config          │  │ QuestionsResult,    │  │ mapper, NetworkModule,    │
+│ (pure JVM)      │  │ QuestionsRepository │  │ QuestionsRepositoryImpl   │
+│                 │  │ (pure JVM, no deps) │  │ (Android library)         │
+└─────────────────┘  └─────────────────────┘  └───────────────────────────┘
 ```
 
 - `:api` holds the public configuration (`StackOverflowConfig`), pure Kotlin/JVM.
@@ -248,9 +251,9 @@ StackOverFlow Home Assignment
 
 - **Language**: Kotlin `2.2.10`, JDK `17` (Gradle toolchain)
 - **Build**: AGP `9.3.3`, Gradle version catalog (no convention plugins)
-- **Networking**: Retrofit `3.0.0` (brings OkHttp `4.12.0`), kotlinx.serialization `1.10.0`
+- **Networking**: Retrofit `3.0.0`, OkHttp `4.12.0` (explicit timeouts), kotlinx.serialization `1.10.0`
 - **Async**: Kotlin Coroutines `1.10.2`
-- **Testing**: JUnit 4, `MockWebServer`, `kotlinx-coroutines-test`
+- **Testing**: JUnit 4, Robolectric `4.14.1`, `MockWebServer`, `kotlinx-coroutines-test`
 - **Android**: `minSdk` 24, `compileSdk` 37
 
 ---
@@ -267,8 +270,9 @@ StackOverFlow Home Assignment
 
 ```bash
 ./gradlew :app:assembleDebug                 # build the sample app (and the SDK)
-./gradlew :stackoverflowsdk:data:test        # networking layer tests (MockWebServer)
-./gradlew :stackoverflowsdk:testDebugUnitTest # facade/config tests
+./gradlew :stackoverflowsdk:data:testDebugUnitTest # networking layer tests (MockWebServer + Robolectric)
+./gradlew :stackoverflowsdk:api:test               # config tests
+./gradlew :stackoverflowsdk:testDebugUnitTest      # facade tests
 ```
 
 ---
@@ -278,7 +282,7 @@ StackOverFlow Home Assignment
 - **Mapper**: HTML entity decoding (numeric, hex, named, no double decoding), DTO to domain mapping.
 - **Repository** (against `MockWebServer`): success mapping, correct endpoint and query parameters
   (30-day window, paging, `no-answers` for the filter), HTTP error, malformed body, connection
-  failure.
+  failure, unknown host.
 - **Config** (`:api`): defaults and validation.
 - **Facade**: `create()` does no I/O.
 
