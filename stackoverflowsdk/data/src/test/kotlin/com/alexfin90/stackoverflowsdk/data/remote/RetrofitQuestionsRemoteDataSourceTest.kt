@@ -1,15 +1,20 @@
 package com.alexfin90.stackoverflowsdk.data.remote
 
 import com.alexfin90.stackoverflowsdk.data.di.NetworkModule
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 
 /** Transport behaviour: requests sent and exceptions translated, against a real HTTP stack. */
 class RetrofitQuestionsRemoteDataSourceTest {
@@ -103,5 +108,47 @@ class RetrofitQuestionsRemoteDataSourceTest {
         remote = remoteFor("http://nonexistent.invalid/")
 
         assertTrue(latest() is RemoteResult.Failure.Network)
+    }
+
+    @Test
+    fun `getQuestion calls the id endpoint`() = runTest {
+        server.enqueue(json("""{"items":[{"question_id":42,"title":"t","link":"l","creation_date":1}]}"""))
+
+        val result = remote.getQuestion(42)
+
+        val url = server.takeRequest().requestUrl!!
+        assertEquals("/2.3/questions/42", url.encodedPath)
+        assertEquals("stackoverflow", url.queryParameter("site"))
+        assertEquals(42L, (result as RemoteResult.Success).value.items.single().questionId)
+    }
+
+    @Test
+    fun `getQuestion http error becomes Http failure`() = runTest {
+        server.enqueue(json("{}", code = 500))
+
+        assertEquals(500, (remote.getQuestion(1) as RemoteResult.Failure.Http).code)
+    }
+
+    @Test
+    fun `getQuestion connection failure becomes Network`() = runTest {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+
+        assertTrue(remote.getQuestion(1) is RemoteResult.Failure.Network)
+    }
+
+    @Test
+    fun `cancelling a slow call is not turned into a result and does not crash`() = runTest {
+        // The server accepts the request and never answers, so the call is in flight until cancelled.
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        var returned: RemoteResult<*>? = null
+
+        val job = launch(Dispatchers.IO) { returned = latest() }
+        server.takeRequest(5, TimeUnit.SECONDS) // the request is really in flight
+        job.cancelAndJoin()
+
+        // If the cancellation had been swallowed, `returned` would be a Failure.Unexpected.
+        assertNull(returned)
+        assertTrue(job.isCancelled)
+        // runTest also fails on any uncaught exception, so reaching this line means no crash.
     }
 }

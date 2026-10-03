@@ -5,6 +5,7 @@ import com.alexfin90.stackoverflowsdk.data.remote.QuestionDto
 import com.alexfin90.stackoverflowsdk.data.remote.QuestionsRemoteDataSource
 import com.alexfin90.stackoverflowsdk.data.remote.QuestionsResponseDto
 import com.alexfin90.stackoverflowsdk.data.remote.RemoteResult
+import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -18,7 +19,10 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class QuestionsRepositoryImplTest {
 
-    private class FakeRemote(var result: RemoteResult<QuestionsResponseDto>) : QuestionsRemoteDataSource {
+    private class FakeRemote(
+        var result: RemoteResult<QuestionsResponseDto>,
+        var questionResult: RemoteResult<QuestionsResponseDto> = result,
+    ) : QuestionsRemoteDataSource {
         data class Call(val fromDate: Long, val page: Int, val pageSize: Int, val unansweredOnly: Boolean)
 
         val calls = mutableListOf<Call>()
@@ -31,6 +35,13 @@ class QuestionsRepositoryImplTest {
         ): RemoteResult<QuestionsResponseDto> {
             calls += Call(fromDate, page, pageSize, unansweredOnly)
             return result
+        }
+
+        val requestedIds = mutableListOf<Long>()
+
+        override suspend fun getQuestion(id: Long): RemoteResult<QuestionsResponseDto> {
+            requestedIds += id
+            return questionResult
         }
     }
 
@@ -100,5 +111,39 @@ class QuestionsRepositoryImplTest {
 
         assertNull(result.httpCode)
         assertEquals("bug", result.message)
+    }
+
+    @Test
+    fun `getQuestion maps the first item`() = runTest {
+        val remote = FakeRemote(
+            RemoteResult.Success(QuestionsResponseDto()),
+            questionResult = RemoteResult.Success(QuestionsResponseDto(listOf(dto(7, "A &amp; B")))),
+        )
+
+        val result = repository(remote).getQuestion(7) as QuestionResult.Success
+
+        assertEquals(listOf(7L), remote.requestedIds)
+        assertEquals("A & B", result.question.title)
+    }
+
+    @Test
+    fun `getQuestion with no items is NotFound`() = runTest {
+        val remote = FakeRemote(
+            RemoteResult.Success(QuestionsResponseDto()),
+            questionResult = RemoteResult.Success(QuestionsResponseDto()),
+        )
+
+        assertEquals(QuestionResult.NotFound, repository(remote).getQuestion(999))
+    }
+
+    @Test
+    fun `getQuestion failures map to the right results`() = runTest {
+        fun withFailure(f: RemoteResult.Failure) =
+            FakeRemote(RemoteResult.Success(QuestionsResponseDto()), questionResult = f)
+
+        assertTrue(repository(withFailure(RemoteResult.Failure.Network("x"))).getQuestion(1) is QuestionResult.NetworkError)
+        assertEquals(500, (repository(withFailure(RemoteResult.Failure.Http(500, "e"))).getQuestion(1) as QuestionResult.ApiError).httpCode)
+        assertNull((repository(withFailure(RemoteResult.Failure.Malformed("m"))).getQuestion(1) as QuestionResult.ApiError).httpCode)
+        assertNull((repository(withFailure(RemoteResult.Failure.Unexpected("u"))).getQuestion(1) as QuestionResult.ApiError).httpCode)
     }
 }

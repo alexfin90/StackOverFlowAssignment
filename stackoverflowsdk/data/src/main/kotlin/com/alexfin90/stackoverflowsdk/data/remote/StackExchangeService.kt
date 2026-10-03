@@ -1,6 +1,7 @@
 package com.alexfin90.stackoverflowsdk.data.remote
 
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
@@ -27,6 +28,13 @@ internal interface StackExchangeService {
         @Query("pagesize") pageSize: Int,
         @Query("order") order: String = "desc",
         @Query("sort") sort: String = "creation",
+        @Query("site") site: String = "stackoverflow",
+    ): QuestionsResponseDto
+
+    /** Same wrapper as the list endpoints: `items` is empty when the id does not exist. */
+    @GET("2.3/questions/{id}")
+    suspend fun question(
+        @Path("id") id: Long,
         @Query("site") site: String = "stackoverflow",
     ): QuestionsResponseDto
 }

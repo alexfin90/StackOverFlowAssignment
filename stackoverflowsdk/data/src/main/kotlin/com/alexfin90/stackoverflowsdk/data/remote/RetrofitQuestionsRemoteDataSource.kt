@@ -23,6 +23,9 @@ internal class RetrofitQuestionsRemoteDataSource(
         }
     }
 
+    override suspend fun getQuestion(id: Long): RemoteResult<QuestionsResponseDto> =
+        safeCall { service.question(id) }
+
     private suspend fun <T> safeCall(request: suspend () -> T): RemoteResult<T> =
         try {
             RemoteResult.Success(request())

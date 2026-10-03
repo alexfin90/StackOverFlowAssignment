@@ -2,6 +2,7 @@ package com.alexfin90.stackoverflowsdk.data
 
 import com.alexfin90.stackoverflowsdk.data.logging.LogLevel
 import com.alexfin90.stackoverflowsdk.data.logging.LogSink
+import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 
@@ -28,6 +29,17 @@ internal class LoggingQuestionsRepository(
         return result
     }
 
+    override suspend fun getQuestion(id: Long): QuestionResult {
+        val start = nanoTime()
+        val result = delegate.getQuestion(id)
+        val millis = (nanoTime() - start) / NANOS_PER_MILLI
+        safeLog(
+            level = result.logLevel(),
+            message = "getQuestion(id=$id) -> ${result.describe()} in $millis ms",
+        )
+        return result
+    }
+
     /** A failing sink (e.g. Logcat unavailable) must never break a request. */
     private fun safeLog(level: LogLevel, message: String) {
         try {
@@ -41,6 +53,19 @@ internal class LoggingQuestionsRepository(
         is QuestionsResult.Success -> LogLevel.DEBUG
         is QuestionsResult.NetworkError -> LogLevel.WARN
         is QuestionsResult.ApiError -> LogLevel.ERROR
+    }
+
+    private fun QuestionResult.logLevel(): LogLevel = when (this) {
+        is QuestionResult.Success, QuestionResult.NotFound -> LogLevel.DEBUG
+        is QuestionResult.NetworkError -> LogLevel.WARN
+        is QuestionResult.ApiError -> LogLevel.ERROR
+    }
+
+    private fun QuestionResult.describe(): String = when (this) {
+        is QuestionResult.Success -> "Success"
+        QuestionResult.NotFound -> "NotFound"
+        is QuestionResult.NetworkError -> "NetworkError"
+        is QuestionResult.ApiError -> "ApiError(httpCode=$httpCode)"
     }
 
     // Kind and counts only: no titles, no error messages (they may echo server content).

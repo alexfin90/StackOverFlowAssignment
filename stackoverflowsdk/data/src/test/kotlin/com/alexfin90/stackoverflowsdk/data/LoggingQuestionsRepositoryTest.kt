@@ -3,6 +3,7 @@ package com.alexfin90.stackoverflowsdk.data
 import com.alexfin90.stackoverflowsdk.data.logging.LogLevel
 import com.alexfin90.stackoverflowsdk.data.logging.LogSink
 import com.alexfin90.stackoverflowsdk.domain.Question
+import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import kotlinx.coroutines.CancellationException
@@ -18,8 +19,13 @@ class LoggingQuestionsRepositoryTest {
     private val lines = mutableListOf<Pair<LogLevel, String>>()
     private val sink: LogSink = { level, message -> lines += level to message }
 
-    private class FakeDelegate(var result: () -> QuestionsResult) : QuestionsRepository {
+    // `result` is last on purpose: a trailing lambda binds to the last parameter.
+    private class FakeDelegate(
+        var questionResult: () -> QuestionResult = { QuestionResult.NotFound },
+        var result: () -> QuestionsResult = { QuestionsResult.Success(emptyList(), false) },
+    ) : QuestionsRepository {
         override suspend fun getLatestQuestions(unansweredOnly: Boolean, page: Int) = result()
+        override suspend fun getQuestion(id: Long) = questionResult()
     }
 
     private fun repository(delegate: QuestionsRepository, log: LogSink = sink) =
@@ -101,5 +107,27 @@ class LoggingQuestionsRepositoryTest {
             // expected
         }
         assertTrue(lines.isEmpty())
+    }
+
+    @Test
+    fun `getQuestion success is logged at debug without the content`() = runTest {
+        val repo = repository(FakeDelegate(questionResult = { QuestionResult.Success(secret) }))
+
+        repo.getQuestion(42)
+
+        val (level, message) = lines.single()
+        assertEquals(LogLevel.DEBUG, level)
+        assertEquals("getQuestion(id=42) -> Success in 5 ms", message)
+        assertFalse(message.contains("Secret"))
+    }
+
+    @Test
+    fun `getQuestion not found is a debug line and errors keep their level`() = runTest {
+        repository(FakeDelegate(questionResult = { QuestionResult.NotFound })).getQuestion(1)
+        repository(FakeDelegate(questionResult = { QuestionResult.NetworkError("offline") })).getQuestion(1)
+        repository(FakeDelegate(questionResult = { QuestionResult.ApiError(500, "e") })).getQuestion(1)
+
+        assertEquals(listOf(LogLevel.DEBUG, LogLevel.WARN, LogLevel.ERROR), lines.map { it.first })
+        assertTrue(lines.last().second.contains("ApiError(httpCode=500)"))
     }
 }

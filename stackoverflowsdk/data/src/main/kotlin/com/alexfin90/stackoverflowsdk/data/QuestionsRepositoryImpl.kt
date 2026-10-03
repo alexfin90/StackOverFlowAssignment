@@ -3,6 +3,7 @@ package com.alexfin90.stackoverflowsdk.data
 import com.alexfin90.stackoverflowsdk.data.mapper.toDomain
 import com.alexfin90.stackoverflowsdk.data.remote.QuestionsRemoteDataSource
 import com.alexfin90.stackoverflowsdk.data.remote.RemoteResult
+import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import kotlinx.coroutines.CancellationException
@@ -32,6 +33,27 @@ internal class QuestionsRepositoryImpl(
             is RemoteResult.Failure.Unexpected -> QuestionsResult.ApiError(null, result.message)
         }
     }
+
+    override suspend fun getQuestion(id: Long): QuestionResult =
+        when (val result = remote.getQuestion(id)) {
+            is RemoteResult.Success -> mapQuestion(result)
+            is RemoteResult.Failure.Network -> QuestionResult.NetworkError(result.message)
+            is RemoteResult.Failure.Http -> QuestionResult.ApiError(result.code, result.message)
+            is RemoteResult.Failure.Malformed ->
+                QuestionResult.ApiError(null, "Unreadable response: ${result.message}")
+            is RemoteResult.Failure.Unexpected -> QuestionResult.ApiError(null, result.message)
+        }
+
+    private fun mapQuestion(result: RemoteResult.Success<com.alexfin90.stackoverflowsdk.data.remote.QuestionsResponseDto>): QuestionResult =
+        try {
+            result.value.items.firstOrNull()?.let { QuestionResult.Success(it.toDomain()) }
+                ?: QuestionResult.NotFound
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Mapping bug: report it as a value, never crash the host.
+            QuestionResult.ApiError(null, e.message ?: e.javaClass.simpleName)
+        }
 
     private fun mapSuccess(result: RemoteResult.Success<com.alexfin90.stackoverflowsdk.data.remote.QuestionsResponseDto>): QuestionsResult =
         try {

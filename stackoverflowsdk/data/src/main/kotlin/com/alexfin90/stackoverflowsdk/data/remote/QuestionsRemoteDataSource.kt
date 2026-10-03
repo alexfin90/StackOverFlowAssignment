@@ -15,4 +15,7 @@ internal interface QuestionsRemoteDataSource {
         pageSize: Int,
         unansweredOnly: Boolean,
     ): RemoteResult<QuestionsResponseDto>
+
+    /** Same wrapper as the list: `items` is empty when the id does not exist. */
+    suspend fun getQuestion(id: Long): RemoteResult<QuestionsResponseDto>
 }

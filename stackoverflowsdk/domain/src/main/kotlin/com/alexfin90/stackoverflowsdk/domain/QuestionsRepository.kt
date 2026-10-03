@@ -13,4 +13,7 @@ public interface QuestionsRepository {
         unansweredOnly: Boolean = false,
         page: Int = 1,
     ): QuestionsResult
+
+    /** Loads one question by id, e.g. to restore a detail screen or to handle a deep link. */
+    public suspend fun getQuestion(id: Long): QuestionResult
 }
