@@ -7,8 +7,10 @@ The assignment asks for an app listing the latest StackOverflow questions, with 
 filter and a detail view, where **the retrieval logic is extracted into a library module** that any
 app can reuse. This project puts the weight on that library: a small, stable, hard-to-misuse SDK.
 
-> **Status.** The SDK (`:stackoverflowsdk` + `:api` + `:domain` + `:data`) is implemented and tested. The
-> sample app screens are in progress, see [Roadmap](#roadmap).
+> **Status.** The SDK (`:stackoverflowsdk` + `:api` + `:domain` + `:data`) and the sample app
+> (list with "unanswered" filter, detail screen, deep link, `mock`/`real` flavors) are implemented,
+> with 52 unit/UI tests. The app was verified through tests and builds, **not run on a device or
+> emulator** in the environment where it was written, see [Known limitations](#known-limitations).
 
 ---
 
@@ -24,6 +26,8 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 - **Explicit timeouts** and **coroutine-cancellation aware**: slow or missing networks fail fast
   as `NetworkError`, cancelled requests stop cleanly.
 - **Unit tests**: `MockWebServer` + Robolectric for the networking layer, plain JUnit elsewhere.
+- **Sample app** with the same modular layout as a production app (`feature:*`, `core:*`), Hilt,
+  immutable UI state, `mock`/`real` flavors, a deep link and Compose UI tests that run on the JVM.
 
 ---
 
@@ -280,11 +284,95 @@ call, so it slides slightly between pages.
 
 ---
 
+## Sample App
+
+The app consumes the SDK like any third party would: through `StackOverflowSdk.create()` and the
+public contract only.
+
+| Feature | Notes |
+|---|---|
+| Latest questions | Last 30 days, newest first, paginated (next page when scrolling near the end) |
+| "Unanswered" filter | Chip; calls the dedicated `no-answers` endpoint, selection survives process death |
+| Loading / empty / error | Spinner, empty message, network vs server error with **Retry** |
+| Detail screen | Title, author, score, answers, tags; **Open in browser** button; loaded by id |
+| Deep link | `stackoverflowdemo://question/{questionId}` opens the detail directly |
+
+### Modules
+
+```mermaid
+flowchart TD
+    app[":app<br/>MainActivity, NavHost, Hilt, flavors"]
+    home[":feature:home<br/>list, filter, paging"]
+    detail[":feature:detail<br/>detail, deep link"]
+    ds[":core:designsystem<br/>theme, components"]
+    common[":core:common<br/>type-safe routes"]
+    sdk[":stackoverflowsdk<br/>the SDK"]
+
+    app --> home
+    app --> detail
+    app --> common
+    app --> sdk
+    home --> ds
+    home --> sdk
+    detail --> ds
+    detail --> common
+    detail --> sdk
+```
+
+Feature modules never depend on each other: navigation between them lives in `:app`, using the
+routes from `:core:common`.
+
+### Product flavors: `mock` and `real`
+
+The flavor is chosen at build time; each one has its own Hilt `SdkModule` in `src/mock` or
+`src/real`, so there is no runtime branching.
+
+| Flavor | `SdkModule` binds | Use it when |
+|---|---|---|
+| `real` | `StackOverflowSdk.create()` | you want the real Stack Exchange API |
+| `mock` | `FakeQuestionsRepository` (in-memory data, 800 ms latency) | offline, demos, UI work. **The SDK networking stack is never built.** |
+
+`mock` has the application id suffix `.mock`, so both can be installed side by side.
+
+### Deep link
+
+```bash
+adb shell am start -a android.intent.action.VIEW -d "stackoverflowdemo://question/1000"
+```
+
+Ids `1000` to `1019` exist in the `mock` flavor, so the link can be tried offline. In `real`, use
+any real StackOverflow question id. It is declared twice, as usual: a manifest `intent-filter`
+(`VIEW`, `BROWSABLE`) and a type-safe `navDeepLink<Route.QuestionDetail>`. It works because the
+detail loads **by id** (`getQuestion(id)` in the SDK): a link carries an id, not a question.
+
+### Compose and architecture practices
+
+- **Immutable UI state**: one `StateFlow` per screen of an `@Immutable` state (`sealed interface`
+  for loading / error / empty / content), `ImmutableList` instead of `List`.
+- **`LazyColumn` with stable `key` and `contentType`**, so items are reused and recomposition stays
+  local.
+- **State hoisting**: a stateful `*Route` (Hilt ViewModel, `collectAsStateWithLifecycle`) wraps a
+  stateless `*Screen` that only takes state and callbacks. That makes screens testable and
+  previewable.
+- **No `Context` in ViewModels**: formatting with string resources and plurals happens in the UI
+  layer.
+- **Stale responses cannot win**: changing the filter cancels the in-flight request.
+- **Design system without strings or SDK types**: components receive ready-to-render models.
+- **Feature modules depend on the SDK contract only**, never on `:data`.
+
+---
+
 ## Module Structure
 
 ```
 StackOverFlow Home Assignment
-├── app                       # Sample consumer app (Compose)
+├── app                       # Sample app: MainActivity, NavHost, Hilt, mock/real flavors
+├── core
+│   ├── common                # Type-safe routes and deep link base (pure JVM)
+│   └── designsystem          # Theme, QuestionRow, filter chip, loading/error/empty states
+├── feature
+│   ├── home                  # Questions list, filter, paging (ViewModel + screen + tests)
+│   └── detail                # Question detail, deep link target (ViewModel + screen + tests)
 └── stackoverflowsdk          # Facade (Android library): StackOverflowSdk
     ├── api                   # Public configuration: StackOverflowConfig (pure JVM)
     ├── domain                # Question, QuestionsResult, QuestionsRepository (pure JVM)
@@ -299,6 +387,9 @@ StackOverFlow Home Assignment
 - **Build**: AGP `9.3.3`, Gradle version catalog (no convention plugins)
 - **Networking**: Retrofit `3.0.0`, OkHttp `4.12.0` (explicit timeouts), kotlinx.serialization `1.10.0`
 - **Async**: Kotlin Coroutines `1.10.2`
+- **UI**: Jetpack Compose (BOM `2026.02.01`), Material 3, Navigation Compose `2.9.3` (type-safe routes),
+  kotlinx-collections-immutable `0.4.0`
+- **DI** (app only): Hilt `2.60.1` + KSP `2.3.12`, Hilt Navigation Compose `1.3.0`
 - **Testing**: JUnit 4, Robolectric `4.14.1`, `MockWebServer`, `kotlinx-coroutines-test`
 - **Android**: `minSdk` 24, `compileSdk` 37
 
@@ -315,10 +406,12 @@ StackOverFlow Home Assignment
 ### Build and test
 
 ```bash
-./gradlew :app:assembleDebug                 # build the sample app (and the SDK)
-./gradlew :stackoverflowsdk:data:testDebugUnitTest # networking layer tests (MockWebServer + Robolectric)
-./gradlew :stackoverflowsdk:api:test               # config tests
-./gradlew :stackoverflowsdk:testDebugUnitTest      # facade tests
+./gradlew :app:installMockDebug     # in-memory data, works offline
+./gradlew :app:installRealDebug     # real Stack Exchange API
+
+./gradlew :stackoverflowsdk:data:testDebugUnitTest # networking layer (MockWebServer + Robolectric)
+./gradlew :stackoverflowsdk:api:test :stackoverflowsdk:testDebugUnitTest
+./gradlew :core:designsystem:testDebugUnitTest :feature:home:testDebugUnitTest :feature:detail:testDebugUnitTest
 ```
 
 ---
@@ -331,6 +424,20 @@ StackOverFlow Home Assignment
   failure, unknown host.
 - **Config** (`:api`): defaults and validation.
 - **Facade**: `create()` does no I/O.
+- **App** (ViewModels and Compose UI): see below.
+
+| Module | Tests | What |
+|---|---|---|
+| `:stackoverflowsdk:data` | 16 | mapper, repository against `MockWebServer` (list, unanswered, by id, errors) |
+| `:stackoverflowsdk:api` | 5 | config defaults and validation |
+| `:stackoverflowsdk` | 1 | `create()` does no I/O |
+| `:core:designsystem` | 4 | components (Compose UI, JVM) |
+| `:feature:home` | 17 | 11 ViewModel + 6 Compose UI (happy and unhappy paths) |
+| `:feature:detail` | 9 | 4 ViewModel + 5 Compose UI (happy and unhappy paths) |
+
+**UI tests run on the JVM** (Compose UI test + Robolectric), against the stateless screens. They
+need no device or emulator, so they run in CI like unit tests. The trade-off: they do not exercise
+real rendering, navigation or the Hilt graph end to end; instrumented tests would cover that.
 
 ### Why Robolectric?
 
@@ -356,16 +463,14 @@ titles, and the repository tests go through the mapper.
 
 ## Roadmap
 
-Work is delivered step by step through pull requests.
+Delivered step by step through stacked pull requests.
 
-- [x] Module structure (facade, domain, data), explicit API mode
-- [x] Domain models, result type and repository contract
-- [x] Data layer: Retrofit service, DTOs, mapper, repository, tests
-- [x] Facade (`StackOverflowSdk`, `StackOverflowConfig`) and README
-- [ ] Sample app: list screen with "unanswered" filter and loading state, detail screen
-      (Compose, ViewModel, Hilt)
-- [ ] App tests: ViewModel unit tests, one happy-path and one unhappy-path UI test
-- [ ] Split the app into `feature:home` and `feature:detail` modules
+- [x] Module structure (facade, api, domain, data), explicit API mode
+- [x] Domain models, result type, repository contract and data layer with tests
+- [x] Facade, config and README
+- [x] SDK: `getQuestion(id)`
+- [x] App: Hilt, `mock`/`real` flavors, design system, list + filter, detail + deep link
+- [x] Unit tests and UI tests (happy and unhappy paths)
 
 ### What I would add with more time (SDK)
 
@@ -376,8 +481,31 @@ Work is delivered step by step through pull requests.
   with semantic versioning and a deprecation policy
 - `Flow`-based API for paging/refresh on top of the current `suspend` contract
 
+### What I would add with more time (app)
+
+- Instrumented tests (Hilt end to end, navigation, deep link) and screenshot tests
+- Synthetic back stack so that, after opening the deep link, Back goes to the list
+- Show the question body (needs the API `withbody` filter) and answers
+- Offline cache (Room as single source of truth) in the app, keeping the SDK stateless
+- Paging 3 instead of the hand-written paging, if the list grows in complexity
+
+---
+
+## Known limitations
+
+- The app was **not run on a device or emulator** while writing it; behaviour is verified by 52
+  tests and by building the `mock` and `real` variants. A manual run is the first thing to do.
+- The `fromdate` window slides between pages, so a question at the edge can appear twice (the app
+  de-duplicates by id) or be skipped.
+- Anonymous Stack Exchange requests have a small shared quota; when it is exhausted the app shows
+  the server error state. An API key is not used.
+- Retrofit/OkHttp can still clash with the host's versions at runtime, see
+  [Dependency conflicts](#dependency-conflicts-the-main-trade-off).
+
 ---
 
 ## Notes
 
-This repository is private, as required by the assignment.
+This repository is private, as required by the assignment. AI coding tools were used to write
+parts of it; the design decisions and trade-offs documented here are reviewed and owned by the
+author.
