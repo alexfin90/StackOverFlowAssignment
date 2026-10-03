@@ -40,12 +40,12 @@ class StackOverflowSdkTest {
 
     @Test
     fun `repository without initialize uses the defaults and does not throw`() {
-        assertNotNull(StackOverflowSdk.repository)
+        assertNotNull(StackOverflowSdk.questionsRepository)
     }
 
     @Test
     fun `repository is a single shared instance`() {
-        assertSame(StackOverflowSdk.repository, StackOverflowSdk.repository)
+        assertSame(StackOverflowSdk.questionsRepository, StackOverflowSdk.questionsRepository)
     }
 
     @Test
@@ -62,7 +62,7 @@ class StackOverflowSdkTest {
 
     @Test
     fun `initialize after the repository was used is ignored`() {
-        StackOverflowSdk.repository
+        StackOverflowSdk.questionsRepository
 
         assertFalse(StackOverflowSdk.initialize(StackOverflowConfig(pageSize = 10)))
     }
@@ -100,10 +100,10 @@ class StackOverflowSdkTest {
     @Test
     fun `warmUp is idempotent and builds the shared instance`() {
         StackOverflowSdk.warmUp()
-        val first = StackOverflowSdk.repository
+        val first = StackOverflowSdk.questionsRepository
         StackOverflowSdk.warmUp()
 
-        assertSame(first, StackOverflowSdk.repository)
+        assertSame(first, StackOverflowSdk.questionsRepository)
     }
 
     @Test
@@ -113,7 +113,7 @@ class StackOverflowSdkTest {
         val futures = (1..8).map {
             executor.submit<Any> {
                 start.await()
-                StackOverflowSdk.repository
+                StackOverflowSdk.questionsRepository
             }
         }
         start.countDown()

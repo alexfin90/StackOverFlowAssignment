@@ -15,5 +15,5 @@ object SdkModule {
 
     @Provides
     @Singleton
-    fun provideQuestionsRepository(): QuestionsRepository = StackOverflowSdk.repository
+    fun provideQuestionsRepository(): QuestionsRepository = StackOverflowSdk.questionsRepository
 }
