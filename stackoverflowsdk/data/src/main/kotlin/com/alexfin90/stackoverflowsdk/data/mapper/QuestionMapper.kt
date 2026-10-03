@@ -17,8 +17,9 @@ internal fun QuestionDto.toDomain(): Question = Question(
 private val numericEntity = Regex("&#(x?)([0-9a-fA-F]+);")
 
 /**
- * The API returns titles HTML-encoded (`&#39;`, `&amp;`, ...). Decoding here keeps
- * the SDK free from android.text.Html and the domain model plain text.
+ * The API returns titles HTML-encoded (`&#39;`, `&amp;`, ...). This module is plain Kotlin/JVM,
+ * so android.text.Html is not available: we decode the entities the API actually emits.
+ * Other named entities (e.g. `&nbsp;`) are left as they are.
  */
 internal fun String.decodeHtmlEntities(): String =
     numericEntity.replace(this) { match ->
