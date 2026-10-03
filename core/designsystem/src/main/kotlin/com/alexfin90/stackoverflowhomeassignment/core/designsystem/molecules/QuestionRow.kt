@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -14,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.TestTags
@@ -54,7 +56,9 @@ fun QuestionRow(
 
 @Composable
 private fun AnswerBadge(label: String, highlighted: Boolean) {
+    // Fixed width so every title starts at the same x, whatever the label ("1 answer", "12 answers").
     Surface(
+        modifier = Modifier.width(BADGE_WIDTH),
         shape = RoundedCornerShape(8.dp),
         color = if (highlighted) {
             MaterialTheme.colorScheme.tertiaryContainer
@@ -65,7 +69,11 @@ private fun AnswerBadge(label: String, highlighted: Boolean) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
         )
     }
 }
+
+private val BADGE_WIDTH = 92.dp
