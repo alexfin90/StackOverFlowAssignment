@@ -80,7 +80,7 @@ libraries, and the risk is contained:
 ┌──────────── :domain ────────────┐   ┌──────────── :data ─────────────┐
 │ Question, QuestionsResult,      │◄──│ Retrofit service, DTOs, mapper,│
 │ QuestionsRepository             │   │ QuestionsRepositoryImpl        │
-│ (pure Kotlin/JVM, no deps)      │   │ (pure Kotlin/JVM)              │
+│ (pure Kotlin/JVM, no deps)      │   │ (Android library)              │
 └─────────────────────────────────┘   └────────────────────────────────┘
 ```
 
@@ -121,10 +121,23 @@ when (val result = questions.getLatestQuestions(unansweredOnly = true, page = 1)
 | Type | Role |
 |---|---|
 | `StackOverflowSdk.create(config)` | Single entry point. Cheap, does no I/O. |
-| `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (default 30). Validated at construction. |
+| `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (default 30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30). Validated at construction. |
 | `QuestionsRepository` | `suspend fun getLatestQuestions(unansweredOnly, page): QuestionsResult` |
 | `QuestionsResult` | Sealed: `Success(questions, hasMore)` / `NetworkError` / `ApiError(httpCode?, message)` |
 | `Question` | Plain domain model, independent from the wire format. Title is already HTML-decoded. |
+
+### Coroutine cancellation
+
+`getLatestQuestions` is cancellable and rethrows `CancellationException` instead of converting it
+to a result: swallowing it would leave a cancelled coroutine running. It can happen when:
+
+- the user leaves the screen while the request is in flight and `viewModelScope` is cancelled;
+- the user changes the filter and the previous job is cancelled (`collectLatest`, `Job.cancel()`);
+- a `withTimeout` expires (`TimeoutCancellationException` is a subclass);
+- a `LaunchedEffect` in Compose leaves the composition or its key changes.
+
+It never crashes the host: the coroutines runtime handles it. It is the only exception that can
+leave the SDK.
 
 ### Design decisions
 
@@ -142,6 +155,15 @@ when (val result = questions.getLatestQuestions(unansweredOnly = true, page = 1)
   processing, application class, version conflicts). Testability comes from plain constructor
   injection (`QuestionsRepositoryImpl` receives its service). Hilt is a good fit for the *sample
   app*, where it will be used.
+- **Timeouts are explicit.** Connect timeout (default 10 s) makes the SDK fail fast on a dead
+  network; call timeout (default 30 s) caps the whole request. A timeout is an `IOException`, so it
+  becomes `QuestionsResult.NetworkError`, same as offline or DNS failure (`UnknownHostException`).
+- **`:data` is an Android library, `:domain` is pure JVM.** Only the contract needs to be
+  framework-free. `:data` uses `Html.fromHtml` to decode HTML entities in titles; its tests run
+  with Robolectric.
+- **No offline cache.** Out of scope: the SDK stays stateless (a database would add dependencies
+  and conflict risk). A cache would live in the app (e.g. Room as source of truth with a fallback
+  on `NetworkError`) or as an optional OkHttp HTTP cache.
 - **`minSdk` 24**, to keep the SDK integrable by apps with a low minimum.
 - **INTERNET permission** is declared in the SDK manifest and merged into the host app.
 
@@ -181,7 +203,7 @@ StackOverFlow Home Assignment
 ├── app                       # Sample consumer app (Compose)
 └── stackoverflowsdk          # Facade (Android library): StackOverflowSdk, StackOverflowConfig
     ├── domain                # Question, QuestionsResult, QuestionsRepository (pure JVM)
-    └── data                  # Retrofit service, DTOs, mapper, repository impl (pure JVM)
+    └── data                  # Retrofit service, DTOs, mapper, repository impl (Android library)
 ```
 
 ---

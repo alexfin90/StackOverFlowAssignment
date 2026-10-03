@@ -11,22 +11,32 @@ package com.alexfin90.stackoverflowsdk
  *   or a test server.
  * @param pageSize questions per page, between 1 and 100 (API limit).
  * @param lastDays only questions created in the last [lastDays] days are returned.
+ * @param connectTimeoutSeconds max time to open the connection; fails fast when offline.
+ * @param callTimeoutSeconds hard cap for a whole request, including slow responses.
  */
 public class StackOverflowConfig(
     public val baseUrl: String = DEFAULT_BASE_URL,
     public val pageSize: Int = DEFAULT_PAGE_SIZE,
     public val lastDays: Int = DEFAULT_LAST_DAYS,
+    public val connectTimeoutSeconds: Long = DEFAULT_CONNECT_TIMEOUT_SECONDS,
+    public val callTimeoutSeconds: Long = DEFAULT_CALL_TIMEOUT_SECONDS,
 ) {
     init {
         require(baseUrl.endsWith("/")) { "baseUrl must end with '/': $baseUrl" }
         require(pageSize in 1..MAX_PAGE_SIZE) { "pageSize must be in 1..$MAX_PAGE_SIZE: $pageSize" }
         require(lastDays > 0) { "lastDays must be > 0: $lastDays" }
+        require(connectTimeoutSeconds > 0) { "connectTimeoutSeconds must be > 0: $connectTimeoutSeconds" }
+        require(callTimeoutSeconds >= connectTimeoutSeconds) {
+            "callTimeoutSeconds ($callTimeoutSeconds) must be >= connectTimeoutSeconds ($connectTimeoutSeconds)"
+        }
     }
 
     public companion object {
         public const val DEFAULT_BASE_URL: String = "https://api.stackexchange.com/"
         public const val DEFAULT_PAGE_SIZE: Int = 30
         public const val DEFAULT_LAST_DAYS: Int = 30
+        public const val DEFAULT_CONNECT_TIMEOUT_SECONDS: Long = 10
+        public const val DEFAULT_CALL_TIMEOUT_SECONDS: Long = 30
         private const val MAX_PAGE_SIZE = 100
     }
 }

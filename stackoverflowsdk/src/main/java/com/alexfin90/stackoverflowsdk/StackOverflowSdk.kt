@@ -28,5 +28,7 @@ public object StackOverflowSdk {
             baseUrl = config.baseUrl,
             pageSize = config.pageSize,
             lastDays = config.lastDays,
+            connectTimeoutSeconds = config.connectTimeoutSeconds,
+            callTimeoutSeconds = config.callTimeoutSeconds,
         )
 }

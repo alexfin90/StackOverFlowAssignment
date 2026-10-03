@@ -32,4 +32,9 @@ class StackOverflowConfigTest {
     fun `create does no io and returns a repository`() {
         assertNotNull(StackOverflowSdk.create())
     }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `call timeout shorter than connect timeout is rejected`() {
+        StackOverflowConfig(connectTimeoutSeconds = 20, callTimeoutSeconds = 10)
+    }
 }
