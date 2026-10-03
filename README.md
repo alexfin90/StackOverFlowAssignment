@@ -459,6 +459,8 @@ The flavor is chosen at build time; each one has its own Hilt `SdkModule` in `sr
 | `mock` | `FakeQuestionsRepository` (in-memory data, 800 ms latency) | offline, demos, UI work. **The SDK networking stack is never built.** |
 
 `mock` has the application id suffix `.mock`, so both can be installed side by side.
+Each flavor also has its own `SdkInitializer`: `real` configures the SDK and warms it up off the main
+thread, `mock` does nothing, so no SDK code runs at all.
 
 ### Deep link
 
