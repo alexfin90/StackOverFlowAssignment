@@ -1,6 +1,8 @@
 package com.alexfin90.stackoverflowsdk.api
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class StackOverflowConfigTest {
@@ -10,6 +12,13 @@ class StackOverflowConfigTest {
         val config = StackOverflowConfig()
         assertEquals("https://api.stackexchange.com/", config.baseUrl)
         assertEquals(30, config.lastDays)
+    }
+
+    @Test
+    fun `logging is off by default`() {
+        val config = StackOverflowConfig()
+        assertFalse(config.loggingEnabled)
+        assertNull(config.logger)
     }
 
     @Test(expected = IllegalArgumentException::class)

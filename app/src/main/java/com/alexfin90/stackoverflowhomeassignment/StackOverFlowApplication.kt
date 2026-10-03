@@ -5,14 +5,23 @@ import android.os.StrictMode
 import android.os.StrictMode.ThreadPolicy.Builder
 import android.os.StrictMode.VmPolicy
 import com.alexfin90.stackoverflowhomeassignment.logging.plantTimberTree
+import com.alexfin90.stackoverflowhomeassignment.core.dispatcher.ApplicationScope
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import javax.inject.Inject
 
 @HiltAndroidApp
 class StackOverFlowApplication : Application() {
+
+    @Inject
+    @field:ApplicationScope
+    lateinit var applicationScope: CoroutineScope
+
     override fun onCreate() {
         super.onCreate()
         plantTimberTree()
         setStrictModePolicy()
+        initializeSdk(applicationScope)
     }
 }
 
