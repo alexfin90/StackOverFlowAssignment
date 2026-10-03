@@ -1,7 +1,8 @@
 package com.alexfin90.stackoverflowsdk.api
 
 /**
- * Configuration for [StackOverflowSdk].
+ * Configuration for the SDK, passed to `StackOverflowSdk.initialize` (once, in `Application`) or
+ * to `StackOverflowSdk.create`.
  *
  * All parameters have sensible defaults, so `StackOverflowConfig()` is enough for most hosts.
  * Invalid values fail fast at construction: a bad configuration is a programming error in the
@@ -12,7 +13,12 @@ package com.alexfin90.stackoverflowsdk.api
  * @param pageSize questions per page, between 1 and 100 (API limit).
  * @param lastDays only questions created in the last [lastDays] days are returned.
  * @param connectTimeoutSeconds max time to open the connection; fails fast when offline.
- * @param callTimeoutSeconds hard cap for a whole request, including slow responses.
+ * @param callTimeoutSeconds hard cap for a whole request, including slow responses. Must be at
+ *   least [connectTimeoutSeconds].
+ * @param loggingEnabled turns the SDK's diagnostic logging on. Off by default: a library should
+ *   be silent unless the host asks otherwise. When on, one line per request is written to Logcat
+ *   with the tag `StackOverflowSdk`: operation, parameters, kind of outcome and duration, never
+ *   response content.
  */
 public class StackOverflowConfig(
     public val baseUrl: String = DEFAULT_BASE_URL,
@@ -20,6 +26,7 @@ public class StackOverflowConfig(
     public val lastDays: Int = DEFAULT_LAST_DAYS,
     public val connectTimeoutSeconds: Long = DEFAULT_CONNECT_TIMEOUT_SECONDS,
     public val callTimeoutSeconds: Long = DEFAULT_CALL_TIMEOUT_SECONDS,
+    public val loggingEnabled: Boolean = false,
 ) {
     init {
         require(baseUrl.endsWith("/")) { "baseUrl must end with '/': $baseUrl" }
