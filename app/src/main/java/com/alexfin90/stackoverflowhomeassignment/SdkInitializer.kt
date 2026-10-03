@@ -14,7 +14,7 @@ import timber.log.Timber
  */
 fun initializeSdk(applicationScope: CoroutineScope) {
     StackOverflowSdk.initialize(
-        StackOverflowConfig(
+        config = StackOverflowConfig(
             loggingEnabled = BuildConfig.DEBUG,
             logger = TimberSdkLogger,
         ),

@@ -14,7 +14,7 @@ import javax.inject.Inject
 class StackOverFlowApplication : Application() {
 
     @Inject
-    @field:ApplicationScope
+    @ApplicationScope
     lateinit var applicationScope: CoroutineScope
 
     override fun onCreate() {
