@@ -1,10 +1,10 @@
 package com.alexfin90.stackoverflowsdk.data
 
-import com.alexfin90.stackoverflowsdk.domain.LogLevel
+import com.alexfin90.stackoverflowsdk.data.logging.LogLevel
+import com.alexfin90.stackoverflowsdk.data.logging.LogSink
 import com.alexfin90.stackoverflowsdk.domain.Question
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
-import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -16,13 +16,13 @@ import org.junit.Test
 class LoggingQuestionsRepositoryTest {
 
     private val lines = mutableListOf<Pair<LogLevel, String>>()
-    private val logger = StackOverflowLogger { level, message -> lines += level to message }
+    private val sink: LogSink = { level, message -> lines += level to message }
 
     private class FakeDelegate(var result: () -> QuestionsResult) : QuestionsRepository {
         override suspend fun getLatestQuestions(unansweredOnly: Boolean, page: Int) = result()
     }
 
-    private fun repository(delegate: QuestionsRepository, log: StackOverflowLogger = logger) =
+    private fun repository(delegate: QuestionsRepository, log: LogSink = sink) =
         LoggingQuestionsRepository(delegate, log, nanoTime = fakeClock())
 
     // Each call to nanoTime advances 5 ms, so the logged duration is deterministic.
@@ -81,7 +81,7 @@ class LoggingQuestionsRepositoryTest {
     }
 
     @Test
-    fun `a throwing logger does not break the request`() = runTest {
+    fun `a failing sink does not break the request`() = runTest {
         val repo = repository(
             FakeDelegate { QuestionsResult.Success(emptyList(), false) },
             log = { _, _ -> error("logger bug") },

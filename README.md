@@ -23,8 +23,8 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 - **Multi-module Gradle project**, no convention plugins (kept simple on purpose for a small project).
 - **Configure once**: `StackOverflowSdk.initialize(config)` in `Application`, cheap and thread-safe,
   with a `warmUp()` the host can run off the main thread. Using the SDK without it is safe.
-- **Optional logging**: off by default, one switch (`loggingEnabled`) and a pluggable
-  `StackOverflowLogger`; the log lines never contain content.
+- **Optional logging**: off by default, one switch (`loggingEnabled`) that writes to Logcat; the
+  log lines never contain content.
 - **Explicit timeouts** and **coroutine-cancellation aware**: slow or missing networks fail fast
   as `NetworkError`, cancelled requests stop cleanly.
 - **Unit tests**: `MockWebServer` + Robolectric for the networking layer, plain JUnit elsewhere.
@@ -238,8 +238,7 @@ prefer to own the instance (tests, DI container, several configurations), use
 | `StackOverflowSdk.questions` | Shared `QuestionsRepository`, built lazily and thread-safe. Uses the defaults if `initialize` was never called. |
 | `StackOverflowSdk.warmUp()` | Builds the shared repository now. Idempotent. Call it **off the main thread**: the SDK creates no threads of its own. |
 | `StackOverflowSdk.create(config)` | Independent repository, ignores `initialize`. Keep and reuse the instance. |
-| `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30), `loggingEnabled` (false), `logger` (Logcat). Validated at construction. |
-| `StackOverflowLogger` / `LogLevel` | Optional sink for the SDK's log lines (`DEBUG`, `WARN`, `ERROR`). |
+| `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30), `loggingEnabled` (false). Validated at construction. |
 | `QuestionsRepository` | `suspend fun getLatestQuestions(unansweredOnly, page): QuestionsResult` |
 | `QuestionsResult` | Sealed: `Success(questions, hasMore)` / `NetworkError` / `ApiError(httpCode?, message)` |
 | `Question` | Plain domain model, independent from the wire format. Title is already HTML-decoded. |
@@ -260,13 +259,7 @@ Off by default: a library should be silent unless the host asks.
 
 ```kotlin
 // Logcat, tag "StackOverflowSdk"
-StackOverflowConfig(loggingEnabled = true)
-
-// Your own framework, e.g. Timber
-StackOverflowConfig(
-    loggingEnabled = true,
-    logger = StackOverflowLogger { level, message -> Timber.tag("SDK").log(priority(level), message) },
-)
+StackOverflowConfig(loggingEnabled = BuildConfig.DEBUG)
 ```
 
 One line per request, for example
@@ -276,8 +269,11 @@ One line per request, for example
 - **What is logged**: the operation, its parameters, the kind of outcome, counts and duration.
 - **What is never logged**: response bodies, titles, authors, or exception messages (they can echo
   server content). This is covered by a test.
-- **A faulty logger cannot break the SDK**: an exception thrown by `StackOverflowLogger.log` is
+- **Logging cannot break the SDK**: a failure while writing the line (e.g. Logcat unavailable) is
   swallowed.
+- **No custom logger on purpose**: a switch is enough for the need, and a pluggable logger would be
+  one more public type to keep stable. If a host needs to route the lines elsewhere (Timber, a file),
+  an optional `logger` parameter can be added later without breaking anyone.
 - Implemented as a decorator (`LoggingQuestionsRepository`) that is only created when logging is
   enabled, so the default path pays nothing and the repository stays free of logging code.
 
@@ -403,7 +399,7 @@ StackOverFlow Home Assignment
 - **Repository** (against a fake data source, no HTTP): DTO to domain mapping, the `fromdate` window
   and the parameters passed down, every failure kind mapped to the right result.
 - **Wiring**: three end-to-end cases through the public factory.
-- **Logging decorator**: exact line format, levels, no content in the lines, a throwing logger and a
+- **Logging decorator**: exact line format, levels, no content in the lines, a failing sink and a
   cancellation do not break the request.
 - **Config** (`:api`): defaults, logging off by default, validation.
 - **Facade**: `initialize` applied once, ignored when repeated or late (with a warning), use without

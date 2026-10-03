@@ -2,9 +2,8 @@ package com.alexfin90.stackoverflowsdk
 
 import com.alexfin90.stackoverflowsdk.api.StackOverflowConfig
 import com.alexfin90.stackoverflowsdk.data.createQuestionsRepository
-import com.alexfin90.stackoverflowsdk.domain.LogLevel
+import android.util.Log
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
-import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
 
 /**
  * Entry point of the SDK.
@@ -41,6 +40,9 @@ public object StackOverflowSdk {
     private var configuration: StackOverflowConfig? = null
     private var shared: QuestionsRepository? = null
 
+    /** Receives the "initialize ignored" warning. Replaced in tests, which have no Logcat. */
+    internal var warningSink: (String) -> Unit = { Log.w(LOG_TAG, it) }
+
     /**
      * Sets the configuration of the shared instance. Cheap: it only stores and validates the
      * configuration, so it is safe to call on the main thread at app startup.
@@ -55,10 +57,9 @@ public object StackOverflowSdk {
         synchronized(lock) {
             val current = configuration
             if (current != null || shared != null) {
-                resolveLogger(current ?: StackOverflowConfig())?.logSafely(
-                    LogLevel.WARN,
-                    "initialize() ignored: the SDK is already initialized or in use",
-                )
+                if ((current ?: StackOverflowConfig()).loggingEnabled) {
+                    warn("initialize() ignored: the SDK is already initialized or in use")
+                }
                 false
             } else {
                 configuration = config
@@ -100,6 +101,7 @@ public object StackOverflowSdk {
         synchronized(lock) {
             configuration = null
             shared = null
+            warningSink = { Log.w(LOG_TAG, it) }
         }
     }
 
@@ -110,17 +112,16 @@ public object StackOverflowSdk {
             lastDays = config.lastDays,
             connectTimeoutSeconds = config.connectTimeoutSeconds,
             callTimeoutSeconds = config.callTimeoutSeconds,
-            logger = resolveLogger(config),
+            loggingEnabled = config.loggingEnabled,
         )
 
-    private fun resolveLogger(config: StackOverflowConfig): StackOverflowLogger? =
-        if (config.loggingEnabled) config.logger ?: LogcatLogger else null
-
-    private fun StackOverflowLogger.logSafely(level: LogLevel, message: String) {
+    private fun warn(message: String) {
         try {
-            log(level, message)
+            warningSink(message)
         } catch (_: Exception) {
-            // A faulty host logger must not break the SDK.
+            // Logging must never break the SDK.
         }
     }
+
+    private const val LOG_TAG = "StackOverflowSdk"
 }

@@ -1,9 +1,9 @@
 package com.alexfin90.stackoverflowsdk.data
 
-import com.alexfin90.stackoverflowsdk.domain.LogLevel
+import com.alexfin90.stackoverflowsdk.data.logging.LogLevel
+import com.alexfin90.stackoverflowsdk.data.logging.LogSink
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
-import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
 
 /**
  * Decorator that logs one line per call and delegates everything else: the repository itself
@@ -11,7 +11,7 @@ import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
  */
 internal class LoggingQuestionsRepository(
     private val delegate: QuestionsRepository,
-    private val logger: StackOverflowLogger,
+    private val log: LogSink,
     private val nanoTime: () -> Long = System::nanoTime,
 ) : QuestionsRepository {
 
@@ -28,10 +28,10 @@ internal class LoggingQuestionsRepository(
         return result
     }
 
-    /** A faulty host logger must never break a request. */
+    /** A failing sink (e.g. Logcat unavailable) must never break a request. */
     private fun safeLog(level: LogLevel, message: String) {
         try {
-            logger.log(level, message)
+            log(level, message)
         } catch (_: Exception) {
             // Swallowed on purpose.
         }

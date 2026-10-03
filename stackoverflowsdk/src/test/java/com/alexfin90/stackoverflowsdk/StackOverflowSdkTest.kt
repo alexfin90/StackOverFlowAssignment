@@ -1,8 +1,6 @@
 package com.alexfin90.stackoverflowsdk
 
 import com.alexfin90.stackoverflowsdk.api.StackOverflowConfig
-import com.alexfin90.stackoverflowsdk.domain.LogLevel
-import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -17,16 +15,17 @@ import java.util.concurrent.Executors
 
 class StackOverflowSdkTest {
 
-    @Before
-    @After
-    fun reset() = StackOverflowSdk.resetForTesting()
+    private val warnings = mutableListOf<String>()
 
-    private class RecordingLogger : StackOverflowLogger {
-        val lines = mutableListOf<Pair<LogLevel, String>>()
-        override fun log(level: LogLevel, message: String) {
-            lines += level to message
-        }
+    // One @Before: the order of several @Before methods is not guaranteed in JUnit 4.
+    @Before
+    fun setUp() {
+        StackOverflowSdk.resetForTesting()
+        StackOverflowSdk.warningSink = { warnings += it }
     }
+
+    @After
+    fun tearDown() = StackOverflowSdk.resetForTesting()
 
     @Test
     fun `create does no io and returns a repository`() {
@@ -68,31 +67,27 @@ class StackOverflowSdkTest {
     }
 
     @Test
-    fun `ignored initialize logs a warning to the active logger`() {
-        val logger = RecordingLogger()
-        StackOverflowSdk.initialize(StackOverflowConfig(loggingEnabled = true, logger = logger))
+    fun `ignored initialize logs a warning when logging is enabled`() {
+        StackOverflowSdk.initialize(StackOverflowConfig(loggingEnabled = true))
 
         StackOverflowSdk.initialize(StackOverflowConfig())
 
-        assertEquals(1, logger.lines.size)
-        assertEquals(LogLevel.WARN, logger.lines.single().first)
+        assertEquals(1, warnings.size)
     }
 
     @Test
     fun `ignored initialize is silent when logging is disabled`() {
-        val logger = RecordingLogger()
-        StackOverflowSdk.initialize(StackOverflowConfig(loggingEnabled = false, logger = logger))
+        StackOverflowSdk.initialize(StackOverflowConfig(loggingEnabled = false))
 
         StackOverflowSdk.initialize(StackOverflowConfig())
 
-        assertTrue(logger.lines.isEmpty())
+        assertTrue(warnings.isEmpty())
     }
 
     @Test
-    fun `a throwing logger does not break initialize`() {
-        StackOverflowSdk.initialize(
-            StackOverflowConfig(loggingEnabled = true, logger = { _, _ -> error("boom") }),
-        )
+    fun `a failing log sink does not break initialize`() {
+        StackOverflowSdk.warningSink = { error("boom") }
+        StackOverflowSdk.initialize(StackOverflowConfig(loggingEnabled = true))
 
         assertFalse(StackOverflowSdk.initialize(StackOverflowConfig()))
     }

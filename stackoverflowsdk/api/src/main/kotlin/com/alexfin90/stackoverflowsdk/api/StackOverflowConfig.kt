@@ -1,7 +1,5 @@
 package com.alexfin90.stackoverflowsdk.api
 
-import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
-
 /**
  * Configuration for the SDK, passed to `StackOverflowSdk.initialize` (once, in `Application`) or
  * to `StackOverflowSdk.create`.
@@ -18,10 +16,9 @@ import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
  * @param callTimeoutSeconds hard cap for a whole request, including slow responses. Must be at
  *   least [connectTimeoutSeconds].
  * @param loggingEnabled turns the SDK's diagnostic logging on. Off by default: a library should
- *   be silent unless the host asks otherwise.
- * @param logger where the log lines go when [loggingEnabled] is `true`. `null` (default) writes
- *   to Logcat with the tag `StackOverflowSdk`; pass your own to use Timber or another framework.
- *   Ignored when logging is disabled.
+ *   be silent unless the host asks otherwise. When on, one line per request is written to Logcat
+ *   with the tag `StackOverflowSdk`: operation, parameters, kind of outcome and duration, never
+ *   response content.
  */
 public class StackOverflowConfig(
     public val baseUrl: String = DEFAULT_BASE_URL,
@@ -30,7 +27,6 @@ public class StackOverflowConfig(
     public val connectTimeoutSeconds: Long = DEFAULT_CONNECT_TIMEOUT_SECONDS,
     public val callTimeoutSeconds: Long = DEFAULT_CALL_TIMEOUT_SECONDS,
     public val loggingEnabled: Boolean = false,
-    public val logger: StackOverflowLogger? = null,
 ) {
     init {
         require(baseUrl.endsWith("/")) { "baseUrl must end with '/': $baseUrl" }
