@@ -20,7 +20,7 @@ import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
  * applicationScope.launch { StackOverflowSdk.warmUp() }
  *
  * // anywhere
- * when (val result = StackOverflowSdk.questionsRepository.getLatestQuestions(unansweredOnly = true)) {
+ * when (val result = StackOverflowSdk.questions.getLatestQuestions(unansweredOnly = true)) {
  *     is QuestionsResult.Success -> ...
  *     is QuestionsResult.NetworkError -> ...
  *     is QuestionsResult.ApiError -> ...
@@ -32,7 +32,7 @@ import com.alexfin90.stackoverflowsdk.domain.StackOverflowLogger
  * Neither needs a `Context`. Network work happens only inside the `suspend` calls of the
  * repository, on the caller's coroutine.
  *
- * The shared instance is thread-safe and never throws: using [questionsRepository] without calling
+ * The shared instance is thread-safe and never throws: using [questions] without calling
  * [initialize] simply uses the default configuration.
  */
 public object StackOverflowSdk {
@@ -45,7 +45,7 @@ public object StackOverflowSdk {
      * Sets the configuration of the shared instance. Cheap: it only stores and validates the
      * configuration, so it is safe to call on the main thread at app startup.
      *
-     * Only the **first** call takes effect, and only if the shared [questionsRepository] has not been used
+     * Only the **first** call takes effect, and only if the shared [questions] has not been used
      * yet. Later calls are ignored (a warning is logged if logging is enabled) and return `false`,
      * so the behaviour of a running SDK never changes underneath its callers.
      *
@@ -73,7 +73,7 @@ public object StackOverflowSdk {
      * The first access builds the HTTP stack (a few milliseconds): call [warmUp] from a
      * background thread at startup to avoid paying that on the main thread.
      */
-    public val questionsRepository: QuestionsRepository
+    public val questions: QuestionsRepository
         get() = synchronized(lock) {
             shared ?: build(configuration ?: StackOverflowConfig().also { configuration = it })
                 .also { shared = it }
@@ -85,7 +85,7 @@ public object StackOverflowSdk {
      * own: the host decides where this runs).
      */
     public fun warmUp() {
-        questionsRepository
+        questions
     }
 
     /**

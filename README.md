@@ -106,7 +106,7 @@ sequenceDiagram
     participant So as Stack Exchange API
 
     App->>Sdk: initialize(config) once, warmUp() off the main thread
-    App->>Sdk: questionsRepository
+    App->>Sdk: questions
     Sdk-->>App: QuestionsRepository (shared, lazy)
     App->>Repo: getLatestQuestions(unansweredOnly, page)
     Note over Repo: fromdate = now - lastDays (seconds)
@@ -192,14 +192,14 @@ rules (validated config, no exceptions across the boundary).
 
 **Singleton, with a conscious trade-off.** `StackOverflowSdk` is a Kotlin `object`: one well-known
 access point that needs no instance and no `Context`, which is how most SDKs are configured once at
-startup. Since `initialize` and the shared `questionsRepository` exist, **it now holds state**, and that has
+startup. Since `initialize` and the shared `questions` property exist, **it now holds state**, and that has
 a price: global mutable state is harder to test and allows one configuration per process. How it is
 contained:
 
 - The shared state is tiny (the configuration and one repository) and guarded by a lock.
 - `initialize` is **once-only**: later or late calls are ignored (and return `false`), so a running
   SDK never changes underneath its callers.
-- Using the shared `questionsRepository` without `initialize` falls back to the defaults, it never throws.
+- Using `StackOverflowSdk.questions` without `initialize` falls back to the defaults, it never throws.
 - `create(config)` still returns an **independent instance** ignoring the shared state: use it in
   tests, for several configurations, or with your own DI container (the sample app does this
   through Hilt).
@@ -221,21 +221,21 @@ StackOverflowSdk.initialize(StackOverflowConfig(callTimeoutSeconds = 20, logging
 applicationScope.launch { StackOverflowSdk.warmUp() }
 
 // 3. Anywhere:
-when (val result = StackOverflowSdk.questionsRepository.getLatestQuestions(unansweredOnly = true, page = 1)) {
+when (val result = StackOverflowSdk.questions.getLatestQuestions(unansweredOnly = true, page = 1)) {
     is QuestionsResult.Success      -> show(result.questions, canLoadMore = result.hasMore)
     is QuestionsResult.NetworkError -> showOffline(result.message)
     is QuestionsResult.ApiError     -> showError(result.httpCode, result.message)
 }
 ```
 
-`initialize` and `warmUp` are optional: `StackOverflowSdk.questionsRepository` works with the defaults. If you
+`initialize` and `warmUp` are optional: `StackOverflowSdk.questions` works with the defaults. If you
 prefer to own the instance (tests, DI container, several configurations), use
 `StackOverflowSdk.create(config)` instead.
 
 | Type | Role |
 |---|---|
 | `StackOverflowSdk.initialize(config)` | Sets the configuration once. Cheap. Returns `true` if applied, `false` if ignored (already initialized or already in use). |
-| `StackOverflowSdk.questionsRepository` | Shared `QuestionsRepository`, built lazily and thread-safe. Uses the defaults if `initialize` was never called. |
+| `StackOverflowSdk.questions` | Shared `QuestionsRepository`, built lazily and thread-safe. Uses the defaults if `initialize` was never called. |
 | `StackOverflowSdk.warmUp()` | Builds the shared repository now. Idempotent. Call it **off the main thread**: the SDK creates no threads of its own. |
 | `StackOverflowSdk.create(config)` | Independent repository, ignores `initialize`. Keep and reuse the instance. |
 | `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30), `loggingEnabled` (false), `logger` (Logcat). Validated at construction. |
