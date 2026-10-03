@@ -2,7 +2,7 @@
 
 # Testing
 
-85 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
+86 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
 what is tested at each layer, with which tools, how to run it, and how to see the coverage.
 
 - [Strategy](#strategy)
@@ -12,6 +12,8 @@ what is tested at each layer, with which tools, how to run it, and how to see th
 - [How to run the tests](#how-to-run-the-tests)
 - [Coverage](#coverage)
 - [What is not tested](#what-is-not-tested)
+
+For the test tags used by the UI tests and by QA automation, see [test-tags.md](test-tags.md).
 
 ## Strategy
 
@@ -24,7 +26,7 @@ is on **many fast unit tests of the logic** and **few tests that exercise the re
      some          Remote data source against a local server: what goes on the wire,
     ───────        how each failure becomes a result (11 tests)
    many            Everything else against fakes: repository, decorator, facade, config,
-  ─────────        mapper, ViewModels, Compose screens (71 tests)
+  ─────────        mapper, ViewModels, Compose screens (72 tests)
 ```
 
 Rules followed everywhere:
@@ -43,10 +45,10 @@ Rules followed everywhere:
 | `:stackoverflowsdk:data` | 36 | mapper (5), remote data source (11), repository (9), logging decorator (8), end-to-end wiring (3) |
 | `:stackoverflowsdk:api` | 6 | configuration defaults and validation |
 | `:stackoverflowsdk` | 12 | `initialize`, `warmUp`, shared instance, concurrency, `create()` |
-| `:core:designsystem` | 5 | components (Compose UI) and title alignment |
+| `:core:designsystem` | 6 | components (Compose UI), title alignment, test tags exposed as `resource-id` |
 | `:feature:home` | 17 | 11 ViewModel + 6 Compose UI (happy and unhappy paths) |
 | `:feature:detail` | 9 | 4 ViewModel + 5 Compose UI (happy and unhappy paths) |
-| **Total** | **85** | |
+| **Total** | **86** | |
 
 ## Tools, and why
 
@@ -239,6 +241,8 @@ say more about quality.
 
 ## What is not tested
 
+- **No Appium / end-to-end suite.** The groundwork exists (stable [test tags](test-tags.md) exposed
+  as `resource-id` in debug builds, and a `mock` flavor with fixed data) but no suite is included.
 - **No instrumented tests.** Hilt wiring, navigation between screens and the deep link are not
   exercised end to end by an automated test. They were checked by hand on an emulator.
 - **No test against the real Stack Exchange API.** It would be slow, flaky and subject to a shared
