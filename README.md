@@ -21,6 +21,10 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 - **Explicit API mode** (`explicitApi()`): the compiler forces every public declaration to be
   deliberate.
 - **Multi-module Gradle project**, no convention plugins (kept simple on purpose for a small project).
+- **Configure once**: `StackOverflowSdk.initialize(config)` in `Application`, cheap and thread-safe,
+  with a `warmUp()` the host can run off the main thread. Using the SDK without it is safe.
+- **Optional logging**: off by default, one switch (`loggingEnabled`) and a pluggable
+  `StackOverflowLogger`; the log lines never contain content.
 - **Explicit timeouts** and **coroutine-cancellation aware**: slow or missing networks fail fast
   as `NetworkError`, cancelled requests stop cleanly.
 - **Unit tests**: `MockWebServer` + Robolectric for the networking layer, plain JUnit elsewhere.
@@ -97,36 +101,49 @@ sequenceDiagram
     participant App as Host app
     participant Sdk as StackOverflowSdk
     participant Repo as QuestionsRepositoryImpl
+    participant Remote as RetrofitQuestionsRemoteDataSource
     participant Http as Retrofit / OkHttp
     participant So as Stack Exchange API
 
-    App->>Sdk: create(config)
-    Sdk-->>App: QuestionsRepository (no I/O)
+    App->>Sdk: initialize(config) once, warmUp() off the main thread
+    App->>Sdk: repository
+    Sdk-->>App: QuestionsRepository (shared, lazy)
     App->>Repo: getLatestQuestions(unansweredOnly, page)
     Note over Repo: fromdate = now - lastDays (seconds)
-    Repo->>Http: GET /2.3/questions or /questions/no-answers
+    Repo->>Remote: getLatestQuestions(fromDate, page, pageSize, unansweredOnly)
+    Remote->>Http: GET /2.3/questions or /questions/no-answers
     Http->>So: HTTP request (connect + call timeouts)
     alt 2xx and valid JSON
         So-->>Http: items, has_more
-        Http-->>Repo: DTOs
+        Http-->>Remote: DTOs
+        Remote-->>Repo: RemoteResult.Success
         Repo-->>App: Success(questions, hasMore)
     else HTTP 4xx/5xx or unreadable body
+        Remote-->>Repo: Failure.Http / Failure.Malformed
         Repo-->>App: ApiError(httpCode?, message)
     else offline, DNS failure, timeout
+        Remote-->>Repo: Failure.Network
         Repo-->>App: NetworkError(message)
     end
 ```
 
 ### Error mapping
 
+Two steps, each with one responsibility. The data source is the only place that knows Retrofit's
+exceptions; the repository only knows `RemoteResult`.
+
 ```mermaid
 flowchart LR
     ex{{"exception in the request"}}
     ex -->|CancellationException| rethrow["rethrown<br/>(coroutine cancelled)"]
-    ex -->|HttpException| api1["ApiError(httpCode)"]
-    ex -->|"IOException<br/>(UnknownHost, Connect, SocketTimeout)"| net["NetworkError"]
-    ex -->|SerializationException| api2["ApiError(null)"]
-    ex -->|"any other Exception"| api3["ApiError(null)"]
+    ex -->|HttpException| h["Failure.Http"]
+    ex -->|"IOException<br/>(UnknownHost, Connect, SocketTimeout)"| n["Failure.Network"]
+    ex -->|SerializationException| m["Failure.Malformed"]
+    ex -->|"any other Exception"| u["Failure.Unexpected"]
+    h --> api1["ApiError(httpCode)"]
+    n --> net["NetworkError"]
+    m --> api2["ApiError(null)"]
+    u --> api3["ApiError(null)"]
 ```
 
 Only the first case leaves the SDK as an exception, and it is handled by the coroutines runtime.
@@ -134,7 +151,10 @@ Only the first case leaves the SDK as an exception, and it is handled by the cor
 - `:api` holds the public configuration (`StackOverflowConfig`), pure Kotlin/JVM.
 - `:domain` is pure Kotlin/JVM with **zero third-party dependencies**. The repository contract only
   uses `suspend`, so it does not even expose coroutines.
-- `:data` hides networking. Its only public symbol is `createQuestionsRepository()`.
+- `:data` hides networking, in three small layers: `QuestionsRepositoryImpl` (public results) →
+  `QuestionsRemoteDataSource` (an interface; transport failures as `RemoteResult`) → the Retrofit
+  service. The repository does not import Retrofit, so the HTTP stack can be swapped or faked
+  without touching it. Its only public symbol is `createQuestionsRepository()`.
 - `:stackoverflowsdk` is the only module apps declare. It re-exports `:domain` with `api(...)`, so
   integrators get the models without declaring `:domain` themselves, and keeps `:data` as
   `implementation`, so integrators cannot see it.
@@ -164,22 +184,26 @@ not part of the supported API.
 ### Patterns: Facade and Singleton
 
 **Facade.** The SDK has several moving parts (Retrofit service, DTOs, mappers, HTTP client,
-repository). The *facade* pattern hides them behind one simple, stable entry point:
-`StackOverflowSdk.create(config)`, which returns a `QuestionsRepository`. The host app does not
-know what is behind it, so internals can change (even the whole HTTP stack) without breaking
-integrators. For an SDK this matters twice: it keeps the public surface minimal, and it gives one
-place to enforce rules (validated config, no exceptions across the boundary).
+repository). The *facade* pattern hides them behind one simple, stable entry point,
+`StackOverflowSdk`, which hands out a `QuestionsRepository`. The host app does not know what is
+behind it, so internals can change (even the whole HTTP stack) without breaking integrators. For an
+SDK this matters twice: it keeps the public surface minimal, and it gives one place to enforce
+rules (validated config, no exceptions across the boundary).
 
-**Singleton.** `StackOverflowSdk` is a Kotlin `object`, i.e. a singleton used as the entry point:
-one well-known, always available access point that needs no instance and no `Context`. A common
-SDK practice is also to build the expensive objects (the HTTP client and its connection pool) once
-and reuse them. Two conscious choices here:
+**Singleton, with a conscious trade-off.** `StackOverflowSdk` is a Kotlin `object`: one well-known
+access point that needs no instance and no `Context`, which is how most SDKs are configured once at
+startup. Since `initialize` and the shared `repository` exist, **it now holds state**, and that has
+a price: global mutable state is harder to test and allows one configuration per process. How it is
+contained:
 
-- The `object` is **stateless**: it only creates repositories. Global mutable state in a singleton
-  hurts testability and makes it impossible to have two configurations in the same process.
-- The *repository* is **not** forced to be a singleton: `create()` returns a new instance and the
-  caller keeps it (typically one per app, provided through DI in the sample app). This keeps tests
-  isolated and the SDK free of hidden global state.
+- The shared state is tiny (the configuration and one repository) and guarded by a lock.
+- `initialize` is **once-only**: later or late calls are ignored (and return `false`), so a running
+  SDK never changes underneath its callers.
+- Using the shared `repository` without `initialize` falls back to the defaults, it never throws.
+- `create(config)` still returns an **independent instance** ignoring the shared state: use it in
+  tests, for several configurations, or with your own DI container (the sample app does this
+  through Hilt).
+- Tests reset the shared state through an `internal` function that is not part of the public API.
 
 ---
 
@@ -190,23 +214,72 @@ and reuse them. Two conscious choices here:
 implementation(project(":stackoverflowsdk"))
 
 // import com.alexfin90.stackoverflowsdk.StackOverflowSdk
-// import com.alexfin90.stackoverflowsdk.api.StackOverflowConfig   (optional)
-val questions: QuestionsRepository = StackOverflowSdk.create()   // no I/O, no Context
+// import com.alexfin90.stackoverflowsdk.api.StackOverflowConfig
+// 1. Application.onCreate: configure once. Cheap, no I/O, no extra thread.
+StackOverflowSdk.initialize(StackOverflowConfig(callTimeoutSeconds = 20, loggingEnabled = BuildConfig.DEBUG))
+// 2. Optional: build the HTTP stack off the main thread so the first request is not slower.
+applicationScope.launch { StackOverflowSdk.warmUp() }
 
-when (val result = questions.getLatestQuestions(unansweredOnly = true, page = 1)) {
+// 3. Anywhere:
+when (val result = StackOverflowSdk.repository.getLatestQuestions(unansweredOnly = true, page = 1)) {
     is QuestionsResult.Success      -> show(result.questions, canLoadMore = result.hasMore)
     is QuestionsResult.NetworkError -> showOffline(result.message)
     is QuestionsResult.ApiError     -> showError(result.httpCode, result.message)
 }
 ```
 
+`initialize` and `warmUp` are optional: `StackOverflowSdk.repository` works with the defaults. If you
+prefer to own the instance (tests, DI container, several configurations), use
+`StackOverflowSdk.create(config)` instead.
+
 | Type | Role |
 |---|---|
-| `StackOverflowSdk.create(config)` | Single entry point. Cheap, does no I/O. |
-| `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (default 30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30). Validated at construction. |
+| `StackOverflowSdk.initialize(config)` | Sets the configuration once. Cheap. Returns `true` if applied, `false` if ignored (already initialized or already in use). |
+| `StackOverflowSdk.repository` | Shared repository, built lazily and thread-safe. Uses the defaults if `initialize` was never called. |
+| `StackOverflowSdk.warmUp()` | Builds the shared repository now. Idempotent. Call it **off the main thread**: the SDK creates no threads of its own. |
+| `StackOverflowSdk.create(config)` | Independent repository, ignores `initialize`. Keep and reuse the instance. |
+| `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30), `loggingEnabled` (false), `logger` (Logcat). Validated at construction. |
+| `StackOverflowLogger` / `LogLevel` | Optional sink for the SDK's log lines (`DEBUG`, `WARN`, `ERROR`). |
 | `QuestionsRepository` | `suspend fun getLatestQuestions(unansweredOnly, page): QuestionsResult` |
 | `QuestionsResult` | Sealed: `Success(questions, hasMore)` / `NetworkError` / `ApiError(httpCode?, message)` |
 | `Question` | Plain domain model, independent from the wire format. Title is already HTML-decoded. |
+
+### Initialization rules
+
+1. **Only the first `initialize` takes effect**, and only if the shared repository was not used yet.
+   Any other call returns `false` and, if logging is enabled, logs a warning. The configuration of a
+   running SDK never changes.
+2. **Using the SDK without `initialize` is safe**: the defaults apply, nothing throws. The first
+   access then freezes that default configuration.
+3. **`initialize` does not block**: it validates and stores the configuration. The expensive part
+   (OkHttp client, Retrofit) is built on first use or in `warmUp()`, on the caller's thread.
+
+### Logging
+
+Off by default: a library should be silent unless the host asks.
+
+```kotlin
+// Logcat, tag "StackOverflowSdk"
+StackOverflowConfig(loggingEnabled = true)
+
+// Your own framework, e.g. Timber
+StackOverflowConfig(
+    loggingEnabled = true,
+    logger = StackOverflowLogger { level, message -> Timber.tag("SDK").log(priority(level), message) },
+)
+```
+
+One line per request, for example
+`getLatestQuestions(unansweredOnly=true, page=2) -> Success(items=20, hasMore=true) in 312 ms`.
+`DEBUG` for success, `WARN` for no connection, `ERROR` for an API error.
+
+- **What is logged**: the operation, its parameters, the kind of outcome, counts and duration.
+- **What is never logged**: response bodies, titles, authors, or exception messages (they can echo
+  server content). This is covered by a test.
+- **A faulty logger cannot break the SDK**: an exception thrown by `StackOverflowLogger.log` is
+  swallowed.
+- Implemented as a decorator (`LoggingQuestionsRepository`) that is only created when logging is
+  enabled, so the default path pays nothing and the repository stays free of logging code.
 
 ### Coroutine cancellation
 
@@ -224,18 +297,18 @@ leave the SDK.
 ### Design decisions
 
 - **Errors are values, not exceptions.** An exception thrown by the SDK would show up as a crash of
-  the *host* app. The repository catches everything (including the unexpected) and maps it to a
-  `QuestionsResult`. The only exception rethrown is `CancellationException`, to respect structured
-  concurrency.
-- **No `Context`, no initialization step.** Nothing blocks the host's startup or leaks an
-  `Activity`.
+  the *host* app. The data source catches everything (including the unexpected) and turns it into
+  a `RemoteResult`; the repository maps that to a `QuestionsResult`. The only exception rethrown is
+  `CancellationException`, to respect structured concurrency.
+- **No `Context`; initialization is optional and non-blocking.** `initialize` only stores a
+  validated configuration, so nothing blocks the host's startup or leaks an `Activity`.
 - **Config validated eagerly.** An invalid configuration is a programming error in the host, so it
   fails fast with a clear message instead of failing at the first request.
 - **Unanswered filter uses the dedicated endpoint** (`/questions/no-answers`) so the filtering is
   done by the server and pagination stays correct.
 - **No DI framework inside the SDK.** Hilt/Dagger would be imposed on the host (annotation
   processing, application class, version conflicts). Testability comes from plain constructor
-  injection (`QuestionsRepositoryImpl` receives its service). Hilt is a good fit for the *sample
+  injection (`QuestionsRepositoryImpl` receives its data source, the data source receives the service). Hilt is a good fit for the *sample
   app*, where it will be used.
 - **Timeouts are explicit.** Connect timeout (default 10 s) makes the SDK fail fast on a dead
   network; call timeout (default 30 s) caps the whole request. A timeout is an `IOException`, so it
@@ -324,11 +397,18 @@ StackOverFlow Home Assignment
 ## Testing
 
 - **Mapper**: HTML entity decoding (numeric, hex, named, no double decoding), DTO to domain mapping.
-- **Repository** (against `MockWebServer`): success mapping, correct endpoint and query parameters
-  (30-day window, paging, `no-answers` for the filter), HTTP error, malformed body, connection
-  failure, unknown host.
-- **Config** (`:api`): defaults and validation.
-- **Facade**: `create()` does no I/O.
+- **Remote data source** (against `MockWebServer`): endpoint and query parameters (30-day window,
+  paging, `no-answers` for the filter), unknown fields ignored, HTTP error, malformed body,
+  connection failure, unknown host.
+- **Repository** (against a fake data source, no HTTP): DTO to domain mapping, the `fromdate` window
+  and the parameters passed down, every failure kind mapped to the right result.
+- **Wiring**: three end-to-end cases through the public factory.
+- **Logging decorator**: exact line format, levels, no content in the lines, a throwing logger and a
+  cancellation do not break the request.
+- **Config** (`:api`): defaults, logging off by default, validation.
+- **Facade**: `initialize` applied once, ignored when repeated or late (with a warning), use without
+  `initialize`, shared instance, `warmUp` idempotent, concurrent access builds one instance,
+  `create()` independent.
 
 ### Why Robolectric?
 
