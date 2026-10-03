@@ -67,25 +67,69 @@ libraries, and the risk is contained:
 
 ## Architecture
 
+### Module dependencies
+
+```mermaid
+flowchart TD
+    app[":app<br/>sample consumer"]
+    sdk[":stackoverflowsdk<br/>facade: StackOverflowSdk"]
+    api[":api<br/>StackOverflowConfig<br/>pure Kotlin/JVM"]
+    domain[":domain<br/>Question, QuestionsResult,<br/>QuestionsRepository<br/>pure Kotlin/JVM, no deps"]
+    data[":data<br/>Retrofit, DTOs, mapper,<br/>NetworkModule, repository impl<br/>Android library"]
+
+    app -->|implementation| sdk
+    sdk -->|api| api
+    sdk -->|api| domain
+    sdk ==>|"implementation (must NOT be api)"| data
+    data -->|api| domain
+
+    classDef hidden stroke-width:3px,stroke-dasharray: 5 3
+    class data hidden
 ```
-┌──────────────────────────── Host app ────────────────────────────┐
-│  :app  (sample consumer)                                         │
-└───────────────────────────────┬──────────────────────────────────┘
-                                │ implementation
-                                ▼
-┌──────────────────────── :stackoverflowsdk ───────────────────────┐
-│  Facade: StackOverflowSdk                                        │
-│  api → :api, :domain      implementation → :data                 │
-└───────┬─────────────────────────┬────────────────────┬───────────┘
-        │ api                     │ api                │ implementation
-        ▼                         ▼                    ▼
-┌─── :api ────────┐  ┌──── :domain ────────┐  ┌──────── :data ────────────┐
-│ Stack Overflow  │  │ Question,           │◄─│ Retrofit service, DTOs,   │
-│ Config          │  │ QuestionsResult,    │  │ mapper, NetworkModule,    │
-│ (pure JVM)      │  │ QuestionsRepository │  │ QuestionsRepositoryImpl   │
-│                 │  │ (pure JVM, no deps) │  │ (Android library)         │
-└─────────────────┘  └─────────────────────┘  └───────────────────────────┘
+
+`api` edges are visible to the host app, `implementation` edges are not. The thick edge is the one
+the IMPORTANT note below is about.
+
+### Request flow
+
+```mermaid
+sequenceDiagram
+    participant App as Host app
+    participant Sdk as StackOverflowSdk
+    participant Repo as QuestionsRepositoryImpl
+    participant Http as Retrofit / OkHttp
+    participant So as Stack Exchange API
+
+    App->>Sdk: create(config)
+    Sdk-->>App: QuestionsRepository (no I/O)
+    App->>Repo: getLatestQuestions(unansweredOnly, page)
+    Note over Repo: fromdate = now - lastDays (seconds)
+    Repo->>Http: GET /2.3/questions or /questions/no-answers
+    Http->>So: HTTP request (connect + call timeouts)
+    alt 2xx and valid JSON
+        So-->>Http: items, has_more
+        Http-->>Repo: DTOs
+        Repo-->>App: Success(questions, hasMore)
+    else HTTP 4xx/5xx or unreadable body
+        Repo-->>App: ApiError(httpCode?, message)
+    else offline, DNS failure, timeout
+        Repo-->>App: NetworkError(message)
+    end
 ```
+
+### Error mapping
+
+```mermaid
+flowchart LR
+    ex{{"exception in the request"}}
+    ex -->|CancellationException| rethrow["rethrown<br/>(coroutine cancelled)"]
+    ex -->|HttpException| api1["ApiError(httpCode)"]
+    ex -->|"IOException<br/>(UnknownHost, Connect, SocketTimeout)"| net["NetworkError"]
+    ex -->|SerializationException| api2["ApiError(null)"]
+    ex -->|"any other Exception"| api3["ApiError(null)"]
+```
+
+Only the first case leaves the SDK as an exception, and it is handled by the coroutines runtime.
 
 - `:api` holds the public configuration (`StackOverflowConfig`), pure Kotlin/JVM.
 - `:domain` is pure Kotlin/JVM with **zero third-party dependencies**. The repository contract only
