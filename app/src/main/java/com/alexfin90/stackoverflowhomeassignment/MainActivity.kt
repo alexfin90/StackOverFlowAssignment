@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import dagger.hilt.android.AndroidEntryPoint
-import com.alexfin90.stackoverflowhomeassignment.ui.theme.StackOverFlowHomeAssignmentTheme
+import com.alexfin90.stackoverflowhomeassignment.core.designsystem.theme.StackOverFlowTheme
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            StackOverFlowHomeAssignmentTheme {
+            StackOverFlowTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
                         name = "Android",
@@ -43,7 +43,7 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
-    StackOverFlowHomeAssignmentTheme {
+    StackOverFlowTheme {
         Greeting("Android")
     }
 }
