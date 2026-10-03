@@ -34,6 +34,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true // BuildConfig.DEBUG for StrictMode
     }
 }
 
@@ -57,4 +58,6 @@ dependencies {
     implementation(project(":stackoverflowsdk"))
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    implementation(project(":core:dispatcher"))
+    implementation(libs.timber)
 }
