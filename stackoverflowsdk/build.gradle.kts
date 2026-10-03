@@ -26,8 +26,14 @@ android {
 dependencies {
     // Deliberately no appcompat/material/core-ktx: every dependency of an SDK ends up in the
     // host app, so we only declare what the code needs.
-    // Facade: re-exports the domain API; data stays an implementation detail.
+    // Public part, re-exported so host apps get StackOverflowConfig and the domain types
+    // by depending on this module only.
+    api(project(":stackoverflowsdk:api"))
     api(project(":stackoverflowsdk:domain"))
+
+    // IMPORTANT: keep `implementation`, never `api`. This is what hides :data (Retrofit, OkHttp,
+    // DTOs, createQuestionsRepository) from host apps. With `api` they would become visible
+    // and part of the public API. See README, "Architecture".
     implementation(project(":stackoverflowsdk:data"))
     testImplementation(libs.junit)
 }

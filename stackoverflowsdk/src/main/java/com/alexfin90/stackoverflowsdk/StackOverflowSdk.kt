@@ -1,5 +1,6 @@
 package com.alexfin90.stackoverflowsdk
 
+import com.alexfin90.stackoverflowsdk.api.StackOverflowConfig
 import com.alexfin90.stackoverflowsdk.data.createQuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 

@@ -1,7 +1,6 @@
-package com.alexfin90.stackoverflowsdk
+package com.alexfin90.stackoverflowsdk.api
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class StackOverflowConfigTest {
@@ -26,11 +25,6 @@ class StackOverflowConfigTest {
     @Test(expected = IllegalArgumentException::class)
     fun `non positive window is rejected`() {
         StackOverflowConfig(lastDays = 0)
-    }
-
-    @Test
-    fun `create does no io and returns a repository`() {
-        assertNotNull(StackOverflowSdk.create())
     }
 
     @Test(expected = IllegalArgumentException::class)

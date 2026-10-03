@@ -72,8 +72,8 @@ libraries, and the risk is contained:
                                 │ implementation
                                 ▼
 ┌──────────────────────── :stackoverflowsdk ───────────────────────┐
-│  Facade: StackOverflowSdk, StackOverflowConfig                   │
-│  api → :domain          implementation → :data                   │
+│  Facade: StackOverflowSdk                                        │
+│  api → :api, :domain      implementation → :data                 │
 └───────────────┬──────────────────────────────────┬───────────────┘
                 │ api                              │ implementation
                 ▼                                  ▼
@@ -84,6 +84,7 @@ libraries, and the risk is contained:
 └─────────────────────────────────┘   └────────────────────────────────┘
 ```
 
+- `:api` holds the public configuration (`StackOverflowConfig`), pure Kotlin/JVM.
 - `:domain` is pure Kotlin/JVM with **zero third-party dependencies**. The repository contract only
   uses `suspend`, so it does not even expose coroutines.
 - `:data` hides networking. Its only public symbol is `createQuestionsRepository()`.
@@ -92,6 +93,14 @@ libraries, and the risk is contained:
   `implementation`, so integrators cannot see it.
 - Rule: no `:data` type may appear in a public signature of the facade, otherwise `implementation`
   would not be enough.
+
+> [!IMPORTANT]
+> **`:data` must stay `implementation` in `:stackoverflowsdk/build.gradle.kts`, never `api`.**
+> That single keyword is what keeps Retrofit, OkHttp, the DTOs and `createQuestionsRepository()`
+> invisible to host apps. There is no opt-in marker or other safeguard behind it: if it were
+> changed to `api(...)`, they would silently become part of the public API (and a breaking change
+> every time they change). A comment in the build file warns about it, and a code review should
+> reject any change to this line.
 
 ### Why is `createQuestionsRepository()` public?
 
@@ -133,6 +142,8 @@ and reuse them. Two conscious choices here:
 // Add to your app
 implementation(project(":stackoverflowsdk"))
 
+// import com.alexfin90.stackoverflowsdk.StackOverflowSdk
+// import com.alexfin90.stackoverflowsdk.api.StackOverflowConfig   (optional)
 val questions: QuestionsRepository = StackOverflowSdk.create()   // no I/O, no Context
 
 when (val result = questions.getLatestQuestions(unansweredOnly = true, page = 1)) {
@@ -225,7 +236,8 @@ call, so it slides slightly between pages.
 ```
 StackOverFlow Home Assignment
 ├── app                       # Sample consumer app (Compose)
-└── stackoverflowsdk          # Facade (Android library): StackOverflowSdk, StackOverflowConfig
+└── stackoverflowsdk          # Facade (Android library): StackOverflowSdk
+    ├── api                   # Public configuration: StackOverflowConfig (pure JVM)
     ├── domain                # Question, QuestionsResult, QuestionsRepository (pure JVM)
     └── data                  # Retrofit service, DTOs, mapper, repository impl (Android library)
 ```
@@ -267,7 +279,8 @@ StackOverFlow Home Assignment
 - **Repository** (against `MockWebServer`): success mapping, correct endpoint and query parameters
   (30-day window, paging, `no-answers` for the filter), HTTP error, malformed body, connection
   failure.
-- **Config**: defaults and validation.
+- **Config** (`:api`): defaults and validation.
+- **Facade**: `create()` does no I/O.
 
 ### Why Robolectric?
 

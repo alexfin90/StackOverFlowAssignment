@@ -1,4 +1,4 @@
-package com.alexfin90.stackoverflowsdk
+package com.alexfin90.stackoverflowsdk.api
 
 /**
  * Configuration for [StackOverflowSdk].
