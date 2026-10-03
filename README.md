@@ -181,7 +181,19 @@ not part of the supported API.
 > exposed with `api(...)` or published as its own artifact). It was left out on purpose to keep the
 > public surface and the amount of concepts small.
 
-### Patterns: Facade and Singleton
+### Design patterns
+
+Where each pattern is used in the SDK, and why. Only patterns that exist in the code are listed.
+
+| Pattern | Where | Why |
+|---|---|---|
+| **Facade** | `StackOverflowSdk` | One simple, stable entry point in front of Retrofit, DTOs, mappers and the HTTP client |
+| **Singleton** (with limits) | `StackOverflowSdk` (`object`) | Configure once at startup (`initialize`) and share one client |
+| **Decorator** | `LoggingQuestionsRepository` | Add logging around the repository without touching it, and only when enabled |
+| **Repository + Data Source** | `QuestionsRepositoryImpl` → `QuestionsRemoteDataSource` | The repository maps outcomes to public results; the data source owns the transport |
+| **Factory / composition root** | `createQuestionsRepository`, `NetworkModule` | The one place where the object graph is assembled (no DI framework in the SDK) |
+| **Mapper** | `QuestionDto.toDomain()` | The wire format never reaches the public model |
+| **Sealed result** | `QuestionsResult`, `RemoteResult` | Errors are values the caller must handle, not exceptions |
 
 **Facade.** The SDK has several moving parts (Retrofit service, DTOs, mappers, HTTP client,
 repository). The *facade* pattern hides them behind one simple, stable entry point,
@@ -204,6 +216,40 @@ contained:
   tests, for several configurations, or with your own DI container (the sample app does this
   through Hilt).
 - Tests reset the shared state through an `internal` function that is not part of the public API.
+
+**Decorator.** `LoggingQuestionsRepository` is not a subclass of the real repository: it
+**wraps** it. Both implement `QuestionsRepository`; the decorator holds the real one as `delegate`,
+calls it, writes one log line and returns the same result. The caller cannot tell the difference.
+
+```mermaid
+classDiagram
+    class QuestionsRepository {
+        <<interface>>
+        +getLatestQuestions(unansweredOnly, page) QuestionsResult
+    }
+    class QuestionsRepositoryImpl
+    class LoggingQuestionsRepository
+    class QuestionsRemoteDataSource {
+        <<interface>>
+    }
+
+    QuestionsRepository <|.. QuestionsRepositoryImpl
+    QuestionsRepository <|.. LoggingQuestionsRepository
+    LoggingQuestionsRepository o-- QuestionsRepository : delegate
+    QuestionsRepositoryImpl --> QuestionsRemoteDataSource
+```
+
+The factory builds it only when `loggingEnabled` is `true`:
+`LoggingQuestionsRepository(QuestionsRepositoryImpl(...), sink)`. Why a decorator and not logging
+inside the repository or a subclass:
+
+- **One responsibility per class**: the repository maps results and knows nothing about logging.
+- **Zero cost when off**: with logging disabled the decorator is never created.
+- **Testable alone**: its tests use a fake repository, no network.
+- **No inheritance**: a subclass would depend on the base class internals and force it to be `open`.
+
+The price: every new method of `QuestionsRepository` must also be added to the decorator. The
+compiler enforces it, so it cannot be forgotten.
 
 ---
 
