@@ -71,6 +71,8 @@ dependencies {
     implementation(project(":stackoverflowsdk"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:common"))
+    implementation(project(":feature:home"))
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_title">Latest questions</string>
+    <string name="home_filter_unanswered">Unanswered</string>
+    <string name="home_retry">Retry</string>
+    <string name="home_error_network">No connection. Check your network and try again.</string>
+    <string name="home_error_server">Stack Overflow is not responding properly. Try again later.</string>
+    <string name="home_empty">No questions found in the last 30 days.</string>
+    <string name="home_unknown_author">unknown</string>
+    <string name="home_subtitle">%1$s · score %2$d · %3$s</string>
+    <plurals name="home_answers">
+        <item quantity="one">%d answer</item>
+        <item quantity="other">%d answers</item>
+    </plurals>
+</resources>

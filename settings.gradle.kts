@@ -26,6 +26,7 @@ rootProject.name = "StackOverFlow Home Assignment"
 include(":app")
 include(":core:common")
 include(":core:designsystem")
+include(":feature:home")
 include(":stackoverflowsdk")
 include(":stackoverflowsdk:api")
 include(":stackoverflowsdk:domain")
