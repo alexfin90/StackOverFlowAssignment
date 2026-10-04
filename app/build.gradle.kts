@@ -75,7 +75,7 @@ dependencies {
     implementation(project(":feature:home"))
     implementation(project(":feature:detail"))
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.hilt.android)
