@@ -101,8 +101,12 @@ adb shell am start -a android.intent.action.VIEW \
   a screen taking it cannot be skipped; the `@Stable` interface can, and a fake can be passed in
   previews and tests without Hilt. Checked with the Compose compiler report: `HomeRoute` is
   `restartable skippable`.
-- **Root as `Theme { App }`**: `StackOverFlowTheme { StackOverFlowApp() }`, then
-  `StackOverFlowAppContent` with the `Scaffold` and the `NavHost`.
+- **One `Scaffold` for the whole app**, as `Theme { App }` -> `AppContent` -> `NavHost`:
+  `StackOverFlowApp` (stateful: owns the `NavHostController`, reads a `MainViewModelContract`) ->
+  `StackOverFlowAppContent` (stateless: the **only** `Scaffold`, with the top bar) -> the `NavHost`
+  in its content. The screens have no `Scaffold` or top bar of their own. The `MainViewModel` owns
+  the state of the part common to every destination (title and back arrow of the top bar), driven
+  by the current destination.
 - **State hoisting**: a stateful `*Route` (Hilt ViewModel, `collectAsStateWithLifecycle`) wraps a
   stateless `*Screen` that only takes state and callbacks. That makes screens testable and
   previewable.

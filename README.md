@@ -9,7 +9,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 
 > **Status.** The SDK (`:stackoverflowsdk` + `:api` + `:domain` + `:data`) and the sample app
 > (list with "unanswered" filter, detail screen, deep link, `mock`/`real` flavors) are implemented,
-> with 89 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
+> with 94 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
 > flavor, detail through the deep link on `mock`), but **not on a physical device**, see
 > [known limitations](docs/roadmap-and-limitations.md#known-limitations).
 

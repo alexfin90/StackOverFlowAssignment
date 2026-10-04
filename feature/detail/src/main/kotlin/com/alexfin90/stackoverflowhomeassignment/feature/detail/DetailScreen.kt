@@ -11,17 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -38,7 +31,6 @@ import com.alexfin90.stackoverflowhomeassignment.core.designsystem.atoms.Loading
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.ErrorState
 
 object DetailTestTags {
-    const val BACK = "detail_back"
     const val OPEN_IN_BROWSER = "detail_open_in_browser"
     const val CONTENT = "detail_content"
 }
@@ -46,7 +38,6 @@ object DetailTestTags {
 /** Stateful entry point: ViewModel + opening the link in the browser. */
 @Composable
 fun DetailRoute(
-    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DetailViewModelContract = hiltViewModel<DetailViewModel>(),
 ) {
@@ -54,59 +45,43 @@ fun DetailRoute(
     val uriHandler = LocalUriHandler.current
     DetailScreen(
         state = state,
-        onBack = onBack,
         onRetry = viewModel::onRetry,
         onOpenInBrowser = uriHandler::openUri,
         modifier = modifier,
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The content of the detail destination. The app-level `Scaffold` owns the top bar (title and back
+ * arrow) and the insets, so this screen has neither.
+ */
 @Composable
 fun DetailScreen(
     state: DetailUiState,
-    onBack: () -> Unit,
     onRetry: () -> Unit,
     onOpenInBrowser: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.detail_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.testTag(DetailTestTags.BACK)) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.detail_back),
-                        )
-                    }
-                },
+    Column(modifier = modifier.fillMaxSize()) {
+        when (state) {
+            DetailUiState.Loading -> LoadingIndicator()
+            is DetailUiState.Error -> ErrorState(
+                message = stringResource(
+                    if (state.reason == DetailError.Network) {
+                        R.string.detail_error_network
+                    } else {
+                        R.string.detail_error_server
+                    },
+                ),
+                retryLabel = stringResource(R.string.detail_retry),
+                onRetry = onRetry,
             )
-        },
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (state) {
-                DetailUiState.Loading -> LoadingIndicator()
-                is DetailUiState.Error -> ErrorState(
-                    message = stringResource(
-                        if (state.reason == DetailError.Network) {
-                            R.string.detail_error_network
-                        } else {
-                            R.string.detail_error_server
-                        },
-                    ),
-                    retryLabel = stringResource(R.string.detail_retry),
-                    onRetry = onRetry,
-                )
-                DetailUiState.NotFound -> ErrorState(
-                    message = stringResource(R.string.detail_not_found),
-                    retryLabel = stringResource(R.string.detail_retry),
-                    onRetry = onRetry,
-                )
-                is DetailUiState.Content -> QuestionContent(state.question, onOpenInBrowser)
-            }
+            DetailUiState.NotFound -> ErrorState(
+                message = stringResource(R.string.detail_not_found),
+                retryLabel = stringResource(R.string.detail_retry),
+                onRetry = onRetry,
+            )
+            is DetailUiState.Content -> QuestionContent(state.question, onOpenInBrowser)
         }
     }
 }

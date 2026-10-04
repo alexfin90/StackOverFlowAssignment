@@ -2,7 +2,7 @@
 
 # Testing
 
-89 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
+94 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
 what is tested at each layer, with which tools, how to run it, and how to see the coverage.
 
 - [Strategy](#strategy)
@@ -24,7 +24,7 @@ is on **many fast unit tests of the logic** and **few tests that exercise the re
      some          Remote data source against a local server: what goes on the wire,
     ───────        how each failure becomes a result (11 tests)
    many            Everything else against fakes: repository, decorator, facade, config,
-  ─────────        mapper, ViewModels, Compose screens and routes (75 tests)
+  ─────────        mapper, ViewModels, Compose screens, routes and the top bar (80 tests)
 ```
 
 Rules followed everywhere:
@@ -43,10 +43,11 @@ Rules followed everywhere:
 | `:stackoverflowsdk:data` | 36 | mapper (5), remote data source (11), repository (9), logging decorator (8), end-to-end wiring (3) |
 | `:stackoverflowsdk:api` | 6 | configuration defaults and validation |
 | `:stackoverflowsdk` | 12 | `initialize`, `warmUp`, shared instance, concurrency, `create()` |
-| `:core:designsystem` | 5 | components (Compose UI) and title alignment |
+| `:core:designsystem` | 7 | components (Compose UI), title alignment, top bar |
 | `:feature:home` | 19 | 11 ViewModel + 6 Compose UI (happy and unhappy paths) + 2 stateful route |
-| `:feature:detail` | 11 | 4 ViewModel + 5 Compose UI (happy and unhappy paths) + 2 stateful route |
-| **Total** | **89** | |
+| `:feature:detail` | 10 | 4 ViewModel + 4 Compose UI (happy and unhappy paths) + 2 stateful route |
+| `:app` | 4 | `MainViewModel`: top bar state per destination |
+| **Total** | **94** | |
 
 ## Tools, and why
 
@@ -139,11 +140,13 @@ would add (see [What is not tested](#what-is-not-tested)).
   more" keeps the list.
 - `HomeRouteTest` (2) and `DetailRouteTest` (2): the **stateful** route against a fake ViewModel
   contract (no Hilt, no repository), which checks that the state is rendered and that events are
-  forwarded.
-- `HomeScreenTest` (6) and `DetailScreenTest` (5): the happy path (list, click, filter chip, content,
-  open link, back) and the unhappy path (network error with retry, server error, not found).
+  forwarded. The back arrow is no longer a screen concern: it is in the shared top bar.
+- `MainViewModelTest` (4): the shared top bar state per destination (title, back arrow only on the detail).
+- `HomeScreenTest` (6) and `DetailScreenTest` (4): the happy path (list, click, filter chip, content,
+  open link) and the unhappy path (network error with retry, server error, not found).
 - `DetailViewModelTest` (4): id read from the route, not found, error then retry, API error.
-- `ComponentsTest` (5): each design system component, plus the alignment of titles in the list.
+- `ComponentsTest` (7): each design system component, the alignment of titles in the list, and the
+  top bar (title; back arrow only when a handler is given).
 
 ## Techniques worth knowing
 

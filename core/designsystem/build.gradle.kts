@@ -31,6 +31,7 @@ dependencies {
     api(libs.androidx.compose.material3)
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material.icons.core)
     api(libs.kotlinx.collections.immutable)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
