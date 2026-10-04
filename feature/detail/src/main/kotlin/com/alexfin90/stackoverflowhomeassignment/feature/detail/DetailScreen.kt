@@ -48,7 +48,7 @@ object DetailTestTags {
 fun DetailRoute(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: DetailViewModel = hiltViewModel(),
+    viewModel: DetailViewModelContract = hiltViewModel<DetailViewModel>(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current

@@ -19,20 +19,20 @@ import javax.inject.Inject
 class DetailViewModel @Inject constructor(
     private val repository: QuestionsRepository,
     savedStateHandle: SavedStateHandle,
-) : ViewModel() {
+) : ViewModel(), DetailViewModelContract {
 
     // Same argument whether we arrive from the list or from a deep link, and it is restored
     // after process death.
     private val questionId: Long = savedStateHandle.toRoute<Route.QuestionDetail>().questionId
 
     private val _state = MutableStateFlow<DetailUiState>(DetailUiState.Loading)
-    val state: StateFlow<DetailUiState> = _state.asStateFlow()
+    override val state: StateFlow<DetailUiState> = _state.asStateFlow()
 
     init {
         load()
     }
 
-    fun onRetry() = load()
+    override fun onRetry() = load()
 
     private fun load() {
         _state.value = DetailUiState.Loading
