@@ -19,12 +19,15 @@ only Compose tests read. To let **UiAutomator, and therefore Appium,** see them 
    `TestTags` in `:core:designsystem` and `DetailTestTags` in `:feature:detail`.
 2. **The switch**: `Modifier.exposeTestTagsAsResourceId()` (in `:core:designsystem`) sets
    `testTagsAsResourceId = true` on the node where it is applied. The app applies it **once**, on the
-   root `NavHost`, and **only in debug builds**:
+   root `Scaffold` of `StackOverFlowAppContent`, and **only in debug builds**:
 
 ```kotlin
-// MainActivity
-AppNavHost(
-    modifier = if (BuildConfig.DEBUG) Modifier.exposeTestTagsAsResourceId() else Modifier,
+// StackOverFlowApp.kt
+Scaffold(
+    modifier = modifier
+        .fillMaxSize()
+        .then(if (BuildConfig.DEBUG) Modifier.exposeTestTagsAsResourceId() else Modifier),
+    // ...
 )
 ```
 

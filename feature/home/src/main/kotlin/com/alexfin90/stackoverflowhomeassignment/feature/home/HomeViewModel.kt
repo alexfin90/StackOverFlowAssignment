@@ -19,12 +19,12 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val repository: QuestionsRepository,
     private val savedStateHandle: SavedStateHandle,
-) : ViewModel() {
+) : ViewModel(), HomeViewModelContract {
 
     private val _state = MutableStateFlow(
         HomeUiState(unansweredOnly = savedStateHandle[KEY_UNANSWERED] ?: false),
     )
-    val state: StateFlow<HomeUiState> = _state.asStateFlow()
+    override val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
     private var loadJob: Job? = null
     private var nextPage = FIRST_PAGE
@@ -33,16 +33,16 @@ class HomeViewModel @Inject constructor(
         refresh()
     }
 
-    fun onUnansweredToggled() {
+    override fun onUnansweredToggled() {
         val unansweredOnly = !_state.value.unansweredOnly
         savedStateHandle[KEY_UNANSWERED] = unansweredOnly
         _state.update { it.copy(unansweredOnly = unansweredOnly) }
         refresh()
     }
 
-    fun onRetry() = refresh()
+    override fun onRetry() = refresh()
 
-    fun onLoadMore() {
+    override fun onLoadMore() {
         val content = _state.value.content
         if (content !is HomeContent.Questions || !content.canLoadMore || content.isLoadingMore) return
         _state.update { it.copy(content = content.copy(isLoadingMore = true)) }
