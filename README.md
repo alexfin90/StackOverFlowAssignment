@@ -9,7 +9,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 
 > **Status.** The SDK (`:stackoverflowsdk` + `:api` + `:domain` + `:data`) and the sample app
 > (list with "unanswered" filter, detail screen, deep link, `mock`/`real` flavors) are implemented,
-> with 89 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
+> with 94 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
 > flavor, detail through the deep link on `mock`), but **not on a physical device**, see
 > [Known limitations](#known-limitations).
 
@@ -511,8 +511,12 @@ adb shell am start -a android.intent.action.VIEW \
   a screen taking it cannot be skipped; the `@Stable` interface can, and a fake can be passed in
   previews and tests without Hilt. Checked with the Compose compiler report: `HomeRoute` is
   `restartable skippable`.
-- **Root as `Theme { App }`**: `StackOverFlowTheme { StackOverFlowApp() }`, then
-  `StackOverFlowAppContent` with the `Scaffold` and the `NavHost`.
+- **One `Scaffold` for the whole app**, as `Theme { App }` -> `AppContent` -> `NavHost`:
+  `StackOverFlowApp` (stateful: owns the `NavHostController`, reads a `MainViewModelContract`) ->
+  `StackOverFlowAppContent` (stateless: the **only** `Scaffold`, with the top bar) -> the `NavHost`
+  in its content. The screens have no `Scaffold` or top bar of their own. The `MainViewModel` owns
+  the state of the part common to every destination (title and back arrow of the top bar), driven
+  by the current destination.
 - **State hoisting**: a stateful `*Route` (Hilt ViewModel, `collectAsStateWithLifecycle`) wraps a
   stateless `*Screen` that only takes state and callbacks. That makes screens testable and
   previewable.
@@ -600,9 +604,10 @@ StackOverFlow Home Assignment
 | `:stackoverflowsdk:data` | 35 | mapper, remote data source, client (fake data source), logging decorator, end-to-end wiring, `getQuestion` |
 | `:stackoverflowsdk:api` | 6 | config defaults and validation |
 | `:stackoverflowsdk` | 12 | `initialize`, `warmUp`, shared instance, concurrency, `create()` |
-| `:core:designsystem` | 5 | components (Compose UI, JVM) and title alignment |
+| `:core:designsystem` | 7 | components (Compose UI, JVM), title alignment, top bar |
 | `:feature:home` | 19 | 11 ViewModel + 6 Compose UI (happy and unhappy paths) + 2 stateful route |
-| `:feature:detail` | 11 | 4 ViewModel + 5 Compose UI (happy and unhappy paths) + 2 stateful route |
+| `:feature:detail` | 10 | 4 ViewModel + 4 Compose UI (happy and unhappy paths) + 2 stateful route |
+| `:app` | 4 | `MainViewModel` (top bar state per destination) |
 
 **UI tests run on the JVM** (Compose UI test + Robolectric), against the stateless screens. They
 need no device or emulator, so they run in CI like unit tests. The trade-off: they do not exercise
@@ -710,7 +715,7 @@ What happens in the unusual situations, and where it is covered.
 ## Known limitations
 
 - Manual checks were limited to an emulator: the list with real data and the detail through the
-  deep link on `mock`. Not tried on a physical device. The rest of the behaviour is covered by 89
+  deep link on `mock`. Not tried on a physical device. The rest of the behaviour is covered by 94
   tests (UI tests run on the JVM, see [Testing](#testing)).
 - "Open in browser" opens the `link` returned by the API. If `stackoverflow.com` blocks your
   network (it can answer 403/503 to some shared IPs, e.g. hotels), the browser shows that error:

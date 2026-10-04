@@ -29,7 +29,6 @@ class DetailScreenTest {
     )
 
     private var opened: String? = null
-    private var backs = 0
     private var retries = 0
 
     private fun show(state: DetailUiState) {
@@ -37,7 +36,6 @@ class DetailScreenTest {
             StackOverFlowTheme {
                 DetailScreen(
                     state = state,
-                    onBack = { backs++ },
                     onRetry = { retries++ },
                     onOpenInBrowser = { opened = it },
                 )
@@ -56,15 +54,6 @@ class DetailScreenTest {
         composeRule.onNodeWithTag(DetailTestTags.OPEN_IN_BROWSER).performClick()
 
         assertEquals("https://stackoverflow.com/q/42", opened)
-    }
-
-    @Test
-    fun backButton_notifiesCaller() {
-        show(DetailUiState.Content(question))
-
-        composeRule.onNodeWithTag(DetailTestTags.BACK).performClick()
-
-        assertEquals(1, backs)
     }
 
     @Test

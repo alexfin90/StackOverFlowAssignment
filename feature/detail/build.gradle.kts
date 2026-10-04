@@ -40,7 +40,6 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.navigation.compose) // SavedStateHandle.toRoute()
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.compose.material.icons.core)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

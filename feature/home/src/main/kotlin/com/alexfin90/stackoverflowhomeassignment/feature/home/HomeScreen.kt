@@ -12,11 +12,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,7 +56,10 @@ fun HomeRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The content of the home destination. The app-level `Scaffold` owns the top bar and the insets, so
+ * this screen has neither: it only lays out the filter and the content below it.
+ */
 @Composable
 fun HomeScreen(
     state: HomeUiState,
@@ -69,38 +69,33 @@ fun HomeScreen(
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
-        modifier = modifier,
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.home_title)) }) },
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                UnansweredFilterChip(
-                    label = stringResource(R.string.home_filter_unanswered),
-                    selected = state.unansweredOnly,
-                    onToggle = onUnansweredToggled,
-                )
-            }
-            when (val content = state.content) {
-                HomeContent.Loading -> LoadingIndicator()
-                is HomeContent.Error -> ErrorState(
-                    message = stringResource(
-                        if (content.reason == ErrorReason.Network) {
-                            R.string.home_error_network
-                        } else {
-                            R.string.home_error_server
-                        },
-                    ),
-                    retryLabel = stringResource(R.string.home_retry),
-                    onRetry = onRetry,
-                )
-                HomeContent.Empty -> EmptyState(stringResource(R.string.home_empty))
-                is HomeContent.Questions -> QuestionsList(
-                    content = content,
-                    onQuestionClick = onQuestionClick,
-                    onLoadMore = onLoadMore,
-                )
-            }
+    Column(modifier = modifier.fillMaxSize()) {
+        Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            UnansweredFilterChip(
+                label = stringResource(R.string.home_filter_unanswered),
+                selected = state.unansweredOnly,
+                onToggle = onUnansweredToggled,
+            )
+        }
+        when (val content = state.content) {
+            HomeContent.Loading -> LoadingIndicator()
+            is HomeContent.Error -> ErrorState(
+                message = stringResource(
+                    if (content.reason == ErrorReason.Network) {
+                        R.string.home_error_network
+                    } else {
+                        R.string.home_error_server
+                    },
+                ),
+                retryLabel = stringResource(R.string.home_retry),
+                onRetry = onRetry,
+            )
+            HomeContent.Empty -> EmptyState(stringResource(R.string.home_empty))
+            is HomeContent.Questions -> QuestionsList(
+                content = content,
+                onQuestionClick = onQuestionClick,
+                onLoadMore = onLoadMore,
+            )
         }
     }
 }

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="home_title">Latest questions</string>
     <string name="home_filter_unanswered">Unanswered</string>
     <string name="home_retry">Retry</string>
     <string name="home_error_network">No connection. Check your network and try again.</string>

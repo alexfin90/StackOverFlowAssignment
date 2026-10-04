@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="detail_title">Question</string>
-    <string name="detail_back">Back</string>
     <string name="detail_open_in_browser">Open in browser</string>
     <string name="detail_retry">Retry</string>
     <string name="detail_error_network">No connection. Check your network and try again.</string>
