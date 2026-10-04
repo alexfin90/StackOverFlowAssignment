@@ -109,8 +109,8 @@ adb shell am start -a android.intent.action.VIEW \
   the error state with **Retry**.
 - To check that the link is registered: `adb shell pm query-activities --brief -a
   android.intent.action.VIEW -d "stackoverflowdemo://question/1000"` lists the matching apps.
-- Pressing Back after opening the link directly leaves the app (the graph is flat, see
-  [Known limitations](roadmap-and-limitations.md#known-limitations)).
+- After opening the link directly, **both the back arrow and the system Back button go to the
+  list**, they do not leave the app (checked on an emulator, by hand and with `input keyevent BACK`).
 
 ---
 
@@ -128,11 +128,13 @@ adb shell am start -a android.intent.action.VIEW \
   `restartable skippable`.
 - **One `Scaffold` for the whole app**, as `Theme { App }` -> `AppContent` -> `NavHost`:
   `StackOverFlowApp` (stateful: reads a `MainViewModelContract`) -> `StackOverFlowAppContent` (the
-  **only** `Scaffold`, with the top bar; it creates the `NavHostController`, which is not a
-  parameter because that type is reported as unstable) -> the `NavHost` in its content, whose
-  graph is `NavGraphBuilder.appNavGraph(...)`. The screens have no `Scaffold` or top bar of their own. The `MainViewModel` owns
-  the state of the part common to every destination (title and back arrow of the top bar), driven
-  by the current destination.
+  **only** `Scaffold`, with the top bar) -> `StackOverFlowNavHost` (private, in the content of the
+  `Scaffold`; it creates its own `NavHostController`, so no composable takes that unstable type as a
+  parameter, and it only reports the current destination through a callback). The graph is written
+  inside the `NavHost`. The back arrow of the top bar asks the system for "back" instead of using
+  the controller, so the `Scaffold` does not need it. The screens have no `Scaffold` or top bar of
+  their own. The `MainViewModel` owns the state of the part common to every destination (title and
+  back arrow), driven by the current destination.
 - **State hoisting**: a stateful `*Route` (Hilt ViewModel, `collectAsStateWithLifecycle`) wraps a
   stateless `*Screen` that only takes state and callbacks. That makes screens testable and
   previewable.
