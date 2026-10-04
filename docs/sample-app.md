@@ -95,6 +95,14 @@ adb shell am start -a android.intent.action.VIEW \
   for loading / error / empty / content), `ImmutableList` instead of `List`.
 - **`LazyColumn` with stable `key` and `contentType`**, so items are reused and recomposition stays
   local.
+- **ViewModel contract (`@Stable`)**: each `*Route` depends on an interface
+  (`HomeViewModelContract`, `DetailViewModelContract`), with `hiltViewModel<...>()` as default. A
+  concrete ViewModel is reported as *unstable* by the Compose tooling (it has mutable properties) and
+  a screen taking it cannot be skipped; the `@Stable` interface can, and a fake can be passed in
+  previews and tests without Hilt. Checked with the Compose compiler report: `HomeRoute` is
+  `restartable skippable`.
+- **Root as `Theme { App }`**: `StackOverFlowTheme { StackOverFlowApp() }`, then
+  `StackOverFlowAppContent` with the `Scaffold` and the `NavHost`.
 - **State hoisting**: a stateful `*Route` (Hilt ViewModel, `collectAsStateWithLifecycle`) wraps a
   stateless `*Screen` that only takes state and callbacks. That makes screens testable and
   previewable.

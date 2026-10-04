@@ -2,7 +2,7 @@
 
 # Testing
 
-85 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
+89 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
 what is tested at each layer, with which tools, how to run it, and how to see the coverage.
 
 - [Strategy](#strategy)
@@ -24,7 +24,7 @@ is on **many fast unit tests of the logic** and **few tests that exercise the re
      some          Remote data source against a local server: what goes on the wire,
     ───────        how each failure becomes a result (11 tests)
    many            Everything else against fakes: repository, decorator, facade, config,
-  ─────────        mapper, ViewModels, Compose screens (71 tests)
+  ─────────        mapper, ViewModels, Compose screens and routes (75 tests)
 ```
 
 Rules followed everywhere:
@@ -44,9 +44,9 @@ Rules followed everywhere:
 | `:stackoverflowsdk:api` | 6 | configuration defaults and validation |
 | `:stackoverflowsdk` | 12 | `initialize`, `warmUp`, shared instance, concurrency, `create()` |
 | `:core:designsystem` | 5 | components (Compose UI) and title alignment |
-| `:feature:home` | 17 | 11 ViewModel + 6 Compose UI (happy and unhappy paths) |
-| `:feature:detail` | 9 | 4 ViewModel + 5 Compose UI (happy and unhappy paths) |
-| **Total** | **85** | |
+| `:feature:home` | 19 | 11 ViewModel + 6 Compose UI (happy and unhappy paths) + 2 stateful route |
+| `:feature:detail` | 11 | 4 ViewModel + 5 Compose UI (happy and unhappy paths) + 2 stateful route |
+| **Total** | **89** | |
 
 ## Tools, and why
 
@@ -137,6 +137,9 @@ would add (see [What is not tested](#what-is-not-tested)).
   toggle, filter restored from `SavedStateHandle`, **a stale response is ignored when the filter
   changes**, paging with de-duplication, no request when there are no more pages, a failed "load
   more" keeps the list.
+- `HomeRouteTest` (2) and `DetailRouteTest` (2): the **stateful** route against a fake ViewModel
+  contract (no Hilt, no repository), which checks that the state is rendered and that events are
+  forwarded.
 - `HomeScreenTest` (6) and `DetailScreenTest` (5): the happy path (list, click, filter chip, content,
   open link, back) and the unhappy path (network error with retry, server error, not found).
 - `DetailViewModelTest` (4): id read from the route, not found, error then retry, API error.

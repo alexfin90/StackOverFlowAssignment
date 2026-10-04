@@ -46,7 +46,7 @@ import kotlinx.coroutines.flow.filter
 fun HomeRoute(
     onQuestionClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel = hiltViewModel(),
+    viewModel: HomeViewModelContract = hiltViewModel<HomeViewModel>(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     HomeScreen(
