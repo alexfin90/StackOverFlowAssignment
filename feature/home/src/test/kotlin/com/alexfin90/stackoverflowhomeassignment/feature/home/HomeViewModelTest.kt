@@ -1,6 +1,7 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.home
 
 import androidx.lifecycle.SavedStateHandle
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadQuestionsPageUseCase
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -22,7 +23,7 @@ class HomeViewModelTest {
     private val repository = FakeQuestionsRepository()
 
     private fun viewModel(handle: SavedStateHandle = SavedStateHandle()) =
-        HomeViewModel(repository, handle)
+        HomeViewModel(LoadQuestionsPageUseCase(repository), handle)
 
     private fun HomeViewModel.questions() = state.value.content as HomeContent.Questions
 

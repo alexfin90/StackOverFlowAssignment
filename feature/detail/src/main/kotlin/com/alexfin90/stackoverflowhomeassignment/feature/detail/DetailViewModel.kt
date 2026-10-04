@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.alexfin90.stackoverflowhomeassignment.core.common.navigation.Route
-import com.alexfin90.stackoverflowsdk.domain.QuestionResult
-import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
+import com.alexfin90.stackoverflowhomeassignment.core.domain.GetQuestionUseCase
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
+import com.alexfin90.stackoverflowhomeassignment.core.domain.QuestionOutcome
+import com.alexfin90.stackoverflowsdk.domain.Question
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +19,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DetailViewModel @Inject constructor(
-    private val repository: QuestionsRepository,
+    private val getQuestion: GetQuestionUseCase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel(), DetailViewModelContract {
 
@@ -37,17 +39,21 @@ class DetailViewModel @Inject constructor(
     private fun load() {
         _state.value = DetailUiState.Loading
         viewModelScope.launch {
-            _state.value = when (val result = repository.getQuestion(questionId)) {
-                is QuestionResult.Success -> DetailUiState.Content(result.question.toDetail())
-                QuestionResult.NotFound -> DetailUiState.NotFound
-                is QuestionResult.NetworkError -> DetailUiState.Error(DetailError.Network)
-                is QuestionResult.ApiError -> DetailUiState.Error(DetailError.Server)
+            _state.value = when (val outcome = getQuestion(questionId)) {
+                is QuestionOutcome.Found -> DetailUiState.Content(outcome.question.toDetail())
+                QuestionOutcome.NotFound -> DetailUiState.NotFound
+                is QuestionOutcome.Failure -> DetailUiState.Error(outcome.reason.toDetailError())
             }
         }
     }
 }
 
-private fun com.alexfin90.stackoverflowsdk.domain.Question.toDetail() = QuestionDetail(
+private fun LoadFailure.toDetailError(): DetailError = when (this) {
+    LoadFailure.Network -> DetailError.Network
+    LoadFailure.Server -> DetailError.Server
+}
+
+private fun Question.toDetail() = QuestionDetail(
     id = id,
     title = title,
     link = link,

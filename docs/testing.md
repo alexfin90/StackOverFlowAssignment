@@ -2,7 +2,7 @@
 
 # Testing
 
-95 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
+106 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
 what is tested at each layer, with which tools, how to run it, and how to see the coverage.
 
 - [Strategy](#strategy)
@@ -26,7 +26,7 @@ is on **many fast unit tests of the logic** and **few tests that exercise the re
      some          Remote data source against a local server: what goes on the wire,
     ───────        how each failure becomes a result (11 tests)
    many            Everything else against fakes: repository, decorator, facade, config,
-  ─────────        mapper, ViewModels, Compose screens, routes and the top bar (81 tests)
+  ─────────        mapper, ViewModels, Compose screens, routes, the top bar and the use cases (92 tests)
 ```
 
 Rules followed everywhere:
@@ -49,7 +49,8 @@ Rules followed everywhere:
 | `:feature:home` | 19 | 11 ViewModel + 6 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:feature:detail` | 10 | 4 ViewModel + 4 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:app` | 4 | `MainViewModel`: top bar state per destination |
-| **Total** | **95** | |
+| `:core:domain` | 11 | use cases: paging with de-duplication, error translation (plain JVM) |
+| **Total** | **106** | |
 
 ## Tools, and why
 
@@ -143,6 +144,9 @@ would add (see [What is not tested](#what-is-not-tested)).
 - `HomeRouteTest` (2) and `DetailRouteTest` (2): the **stateful** route against a fake ViewModel
   contract (no Hilt, no repository), which checks that the state is rendered and that events are
   forwarded. The back arrow is no longer a screen concern: it is in the shared top bar.
+- `LoadQuestionsPageUseCaseTest` (7) and `GetQuestionUseCaseTest` (4): the app domain, on plain JVM
+  with a fake repository: a page is added to the loaded ones, a question coming back in two pages
+  appears once, page 1 starts over, every SDK failure becomes `Network` or `Server`.
 - `MainViewModelTest` (4): the shared top bar state per destination (title, back arrow only on the detail).
 - `HomeScreenTest` (6) and `DetailScreenTest` (4): the happy path (list, click, filter chip, content,
   open link) and the unhappy path (network error with retry, server error, not found).
@@ -176,7 +180,7 @@ would add (see [What is not tested](#what-is-not-tested)).
 All the suites:
 
 ```bash
-./gradlew :stackoverflowsdk:api:test :stackoverflowsdk:testDebugUnitTest \
+./gradlew :core:domain:test :stackoverflowsdk:api:test :stackoverflowsdk:testDebugUnitTest \
   :stackoverflowsdk:data:testDebugUnitTest :core:designsystem:testDebugUnitTest \
   :feature:home:testDebugUnitTest :feature:detail:testDebugUnitTest
 ```

@@ -70,6 +70,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(project(":stackoverflowsdk"))
+    implementation(project(":core:domain"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:common"))
     implementation(project(":feature:home"))

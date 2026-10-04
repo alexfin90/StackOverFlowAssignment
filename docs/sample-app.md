@@ -22,21 +22,46 @@ flowchart TD
     detail[":feature:detail<br/>detail, deep link"]
     ds[":core:designsystem<br/>theme, components"]
     common[":core:common<br/>type-safe routes"]
+    domain[":core:domain<br/>use cases"]
     sdk[":stackoverflowsdk<br/>the SDK"]
 
     app --> home
     app --> detail
     app --> common
     app --> sdk
+    app --> domain
     home --> ds
-    home --> sdk
+    home --> domain
     detail --> ds
     detail --> common
-    detail --> sdk
+    detail --> domain
+    domain --> sdk
 ```
 
 Feature modules never depend on each other: navigation between them lives in `:app`, using the
-routes from `:core:common`.
+routes from `:core:common`. They do not depend on the SDK either: they talk to `:core:domain`, the
+only module between them and the SDK contract (and `:app`, which provides the SDK to Hilt).
+
+### Use cases (`:core:domain`)
+
+Two use cases, both with a reason to exist:
+
+- **`LoadQuestionsPageUseCase`**: loads a page and **adds it to the ones already loaded**, removing
+  duplicates. The SDK returns pages, the screen shows a growing list, and the 30-day window slides
+  between requests, so the same question can come back in two pages. Without the use case this
+  logic would sit in the ViewModel, mixed with the screen state.
+- **`GetQuestionUseCase`**: loads one question.
+
+Both also **translate the SDK results** (`QuestionsResult`, `QuestionResult`) into the app's own
+(`QuestionsPageResult`, `QuestionOutcome`, `LoadFailure`), so the features never see the SDK's
+error types.
+
+What there is **not**: a use case per call. A use case that only forwards one call of the
+repository adds a file and no logic, so those were left out on purpose; the ViewModels keep what is
+about the screen (filter, retry, loading state) and the use cases keep what is about the data.
+
+The module is pure Kotlin/JVM: its tests (`LoadQuestionsPageUseCaseTest`, `GetQuestionUseCaseTest`)
+run without Robolectric.
 
 ## Product flavors: `mock` and `real`
 
