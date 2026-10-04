@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">StackOverFlow Home Assignment</string>
+    <string name="title_home">Latest questions</string>
 </resources>
