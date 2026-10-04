@@ -16,10 +16,10 @@ only Compose tests read. To let **UiAutomator, and therefore Appium,** see them 
 `resource-id` of the element, the root of the UI must opt in. Two pieces, both in this repository:
 
 1. **The tags** are constants, so a test and the screen can never disagree on a name:
-   `TestTags` in `:core:designsystem` and `DetailTestTags` in `:feature:detail`.
+   `TestTags` in `:core:designsystem` (also the shared top bar) and `DetailTestTags` in `:feature:detail`.
 2. **The switch**: `Modifier.exposeTestTagsAsResourceId()` (in `:core:designsystem`) sets
    `testTagsAsResourceId = true` on the node where it is applied. The app applies it **once**, on the
-   root `Scaffold` of `StackOverFlowAppContent`, and **only in debug builds**:
+   **single** `Scaffold` of the app (in `StackOverFlowAppContent`), and **only in debug builds**:
 
 ```kotlin
 // StackOverFlowApp.kt
@@ -60,7 +60,7 @@ Appium itself has **not** been run against the app; there is no Appium suite in 
 | `error` | the error state (message and button) | list, detail (also "question not found") | `TestTags.ERROR` |
 | `error_retry` | the **Retry** button of the error state | list, detail | `TestTags.ERROR_RETRY` |
 | `empty` | the "no questions" state | list | `TestTags.EMPTY` |
-| `detail_back` | the back arrow in the top bar | detail | `DetailTestTags.BACK` |
+| `top_bar_back` | the back arrow of the shared top bar (only shown on the detail) | detail | `TestTags.TOP_BAR_BACK` |
 | `detail_content` | the scrolling content of the question | detail | `DetailTestTags.CONTENT` |
 | `detail_open_in_browser` | the **Open in browser** button | detail | `DetailTestTags.OPEN_IN_BROWSER` |
 

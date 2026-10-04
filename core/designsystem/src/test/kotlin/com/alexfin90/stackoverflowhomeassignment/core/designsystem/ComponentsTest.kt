@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.atoms.LoadingIndicator
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.atoms.UnansweredFilterChip
+import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.AppTopBar
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.EmptyState
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.ErrorState
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.QuestionRow
@@ -108,6 +109,28 @@ class ComponentsTest {
         }
 
         assertEquals(1, lefts.toSet().size)
+    }
+
+    @Test
+    fun appTopBar_showsTheTitleAndNoArrowOnTheStartDestination() {
+        composeRule.setContent {
+            StackOverFlowTheme { AppTopBar(title = "Latest questions") }
+        }
+
+        composeRule.onNodeWithText("Latest questions").assertIsDisplayed()
+        composeRule.onNodeWithTag(TestTags.TOP_BAR_BACK).assertDoesNotExist()
+    }
+
+    @Test
+    fun appTopBar_backArrowCallsOnBack() {
+        var backs = 0
+        composeRule.setContent {
+            StackOverFlowTheme { AppTopBar(title = "Question", onBack = { backs++ }, backLabel = "Back") }
+        }
+
+        composeRule.onNodeWithTag(TestTags.TOP_BAR_BACK).performClick()
+
+        assertEquals(1, backs)
     }
 
     @Test

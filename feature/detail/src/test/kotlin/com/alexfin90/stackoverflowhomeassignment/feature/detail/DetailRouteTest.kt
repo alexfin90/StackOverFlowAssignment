@@ -34,21 +34,18 @@ class DetailRouteTest {
         tags = persistentListOf("kotlin"),
     )
 
-    private fun show(viewModel: DetailViewModelContract, onBack: () -> Unit = {}) {
+    private fun show(viewModel: DetailViewModelContract) {
         composeRule.setContent {
-            StackOverFlowTheme { DetailRoute(onBack = onBack, viewModel = viewModel) }
+            StackOverFlowTheme { DetailRoute(viewModel = viewModel) }
         }
     }
 
     @Test
-    fun route_rendersTheStateAndForwardsBack() {
-        var backs = 0
-        show(FakeDetailViewModel(DetailUiState.Content(question)), onBack = { backs++ })
+    fun route_rendersTheStateOfTheViewModel() {
+        show(FakeDetailViewModel(DetailUiState.Content(question)))
 
         composeRule.onNodeWithText("Why does this crash?").assertIsDisplayed()
-        composeRule.onNodeWithTag(DetailTestTags.BACK).performClick()
-
-        assertEquals(1, backs)
+        composeRule.onNodeWithTag(DetailTestTags.OPEN_IN_BROWSER).assertIsDisplayed()
     }
 
     @Test

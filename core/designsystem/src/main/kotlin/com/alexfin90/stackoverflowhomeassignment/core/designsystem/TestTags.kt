@@ -19,6 +19,7 @@ object TestTags {
     const val EMPTY = "empty"
     const val UNANSWERED_FILTER = "unanswered_filter"
     const val QUESTIONS_LIST = "questions_list"
+    const val TOP_BAR_BACK = "top_bar_back"
     fun questionRow(id: Long) = "question_row_$id"
 }
 
