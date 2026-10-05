@@ -63,6 +63,61 @@ about the screen (filter, retry, loading state) and the use cases keep what is a
 The module is pure Kotlin/JVM: its tests (`LoadQuestionsPageUseCaseTest`, `GetQuestionUseCaseTest`)
 run without Robolectric.
 
+### How paging and the merge work
+
+The SDK returns **one page at a time**: `getLatestQuestions(unansweredOnly, page)` gives the
+questions of that page and `hasMore`, which says whether another page exists. The screen shows a
+**growing list**, so something has to join the pieces.
+
+```mermaid
+sequenceDiagram
+    participant UI as HomeScreen
+    participant VM as HomeViewModel
+    participant UC as LoadQuestionsPageUseCase
+    participant SDK as SDK (QuestionsRepository)
+
+    UI->>VM: scrolled near the end (onLoadMore)
+    Note over VM: loaded = questions shown so far,<br/>nextPage = 2
+    VM->>UC: invoke(unansweredOnly, page = 2, alreadyLoaded = loaded)
+    UC->>SDK: getLatestQuestions(unansweredOnly, 2)
+    SDK-->>UC: Success(questions, hasMore)
+    Note over UC: merge: loaded + new, no duplicates
+    UC-->>VM: Success(QuestionsPage(all questions, hasMore))
+    VM-->>UI: new state with the longer list
+```
+
+The merge rule:
+
+- **Page 1** (opening the screen, changing the filter, retry): the new questions **replace** the
+  list; `alreadyLoaded` is ignored.
+- **Page 2 and later**: the new questions are **appended** to the ones already loaded, and
+  `distinctBy { it.id }` removes duplicates, keeping the **first** occurrence so the order does
+  not change.
+
+Why duplicates happen: the list is sorted from the most recent. If someone posts a question while
+the user is scrolling, everything slides down by one position and the last question of a page
+shows up again at the start of the next one. Example with 3 questions per page:
+
+| Step | What the API answers | List shown |
+|---|---|---|
+| Page 1 | `[10, 9, 8]` | `[10, 9, 8]` |
+| (question 11 is posted) | | |
+| Page 2 | `[8, 7, 6]` (the 8 slid down) | `[10, 9, 8, 7, 6]`, not `[10, 9, 8, 8, 7, 6]` |
+
+Without the de-duplication, question 8 would appear twice, and two items with the same `key` in the
+`LazyColumn` (`key = { it.id }`) make the list **crash**.
+
+Two limits, stated openly:
+
+- The new question (11) does not appear until the list is reloaded: de-duplication removes
+  repeats, it does not add news.
+- If a question is **deleted** meanwhile, the items slide **up** and one can be **skipped** between
+  two pages; de-duplication cannot recover it. It is inherent to numbered pages. The window of 30
+  days is also recomputed on each call, see [the API notes](stackexchange-api.md).
+
+The rule is tested alone, without Android: `LoadQuestionsPageUseCaseTest` ("a question that comes
+back in the next page appears once", "page one starts over and ignores what was loaded").
+
 ## Product flavors: `mock` and `real`
 
 The flavor is chosen at build time; each one has its own Hilt `SdkModule` in `src/mock` or

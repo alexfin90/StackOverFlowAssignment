@@ -60,7 +60,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 | [docs/sdk-api.md](docs/sdk-api.md) | Public API, initialization rules, logging, coroutine cancellation, design decisions |
 | [docs/dependency-conflicts.md](docs/dependency-conflicts.md) | The main trade-off of using Retrofit, and the alternatives |
 | [docs/stackexchange-api.md](docs/stackexchange-api.md) | The Stack Exchange endpoints used and the quirks of the API |
-| [docs/sample-app.md](docs/sample-app.md) | The sample app: features, modules, flavors, deep link, Compose practices |
+| [docs/sample-app.md](docs/sample-app.md) | The sample app: features, modules, use cases and how paging works, flavors, deep link, Compose practices |
 | [docs/testing.md](docs/testing.md) | **Test strategy, tools, how to run, coverage** |
 | [docs/test-tags.md](docs/test-tags.md) | Test tags for Compose tests and Appium/UiAutomator, how they are exposed, the full list |
 | [docs/edge-cases.md](docs/edge-cases.md) | What happens in unusual situations, and the test that covers each |
