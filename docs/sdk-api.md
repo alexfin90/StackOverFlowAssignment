@@ -59,7 +59,8 @@ least once: it tells "nothing yet" from "loaded and empty") and a `status`:
 Rules (all covered by tests; the ones that matter were checked by breaking them on purpose):
 
 - **Starts empty and idle**; call `refresh()` first. One pager per filter value.
-- **One request at a time** (a `Mutex`). `loadMore()` returns at once if something is running or there
+- **One request at a time** (a `Mutex`; the state transitions themselves use `StateFlow.update`, which
+  is atomic but cannot wrap a network call, so the lock is what keeps two callers from asking for the same page). `loadMore()` returns at once if something is running or there
   is no next page, so calling it on every scroll event is safe. `refresh()` waits for its turn and
   replaces the list.
 - **A snapshot of "now" is fixed at `refresh()`**: every page is requested with the same `fromdate`
