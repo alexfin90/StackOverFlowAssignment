@@ -23,7 +23,6 @@ Delivered step by step through stacked pull requests.
 ## What I would add with more time (app)
 
 - Instrumented tests (Hilt end to end, navigation, deep link) and screenshot tests
-- Synthetic back stack so that, after opening the deep link, Back goes to the list
 - Show the question body (needs the API `withbody` filter) and answers
 - Offline cache (Room as single source of truth) in the app, keeping the SDK stateless
 - Paging 3 instead of the hand-written paging, if the list grows in complexity

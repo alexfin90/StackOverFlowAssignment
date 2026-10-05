@@ -84,8 +84,8 @@ adb shell am start -a android.intent.action.VIEW \
   the error state with **Retry**.
 - To check that the link is registered: `adb shell pm query-activities --brief -a
   android.intent.action.VIEW -d "stackoverflowdemo://question/1000"` lists the matching apps.
-- Pressing Back after opening the link directly leaves the app (the graph is flat, see
-  [Known limitations](roadmap-and-limitations.md#known-limitations)).
+- After opening the link directly, **both the back arrow and the system Back button go to the
+  list**, they do not leave the app (checked on an emulator, by hand and with `input keyevent BACK`).
 
 ---
 
