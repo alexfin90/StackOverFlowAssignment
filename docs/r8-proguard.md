@@ -60,6 +60,14 @@ release {
 adb install -r app/build/outputs/apk/real/release/app-real-release.apk
 ```
 
+To check the deep link on the minified build, fire it from a terminal (the id must be a question that exists; the
+other paths are used by hand in the app):
+
+```bash
+adb shell am start -a android.intent.action.VIEW -d "stackoverflowdemo://question/80007925" \
+  -p com.alexfin90.stackoverflowhomeassignment
+```
+
 Use the paths in the table above and watch `adb logcat` for `FATAL EXCEPTION`, `SerializationException`
 or `Unable to create converter`. R8 writes `app/build/outputs/mapping/realRelease/mapping.txt` to see what
 was renamed. Revert the change afterwards: the sample app's release build keeps R8 disabled.

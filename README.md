@@ -91,6 +91,20 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 
 See [docs/testing.md](docs/testing.md) for what each test suite covers and how to see the coverage.
 
+**Try the deep link** from a terminal (with the app installed and an emulator or device connected):
+
+```bash
+# mock flavor: ids 1000..1019 exist, works offline
+adb shell am start -a android.intent.action.VIEW -d "stackoverflowdemo://question/1000" \
+  -p com.alexfin90.stackoverflowhomeassignment.mock
+
+# real flavor: the id of an existing question (80007925 exists at the time of writing)
+adb shell am start -a android.intent.action.VIEW -d "stackoverflowdemo://question/80007925" \
+  -p com.alexfin90.stackoverflowhomeassignment
+```
+
+`-p` picks the flavor, because both register the same link. More in [docs/sample-app.md](docs/sample-app.md#deep-link).
+
 ---
 
 ## Project structure
