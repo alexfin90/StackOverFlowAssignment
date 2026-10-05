@@ -8,10 +8,12 @@ kotlin {
 }
 
 dependencies {
-    // The SDK models and results (Question, ...) are part of the vocabulary of the use cases.
+    // `api`: the use cases expose SDK types (Question, ...) and the features use them, so they must
+    // see them through this module. With `implementation` the features stop compiling.
     api(project(":stackoverflowsdk:domain"))
-    // @Inject on the use cases; Hilt (in the app) builds them.
-    api(libs.javax.inject)
+    // `implementation`: only needed here, to put @Inject on the use cases. Hilt, in the app and the
+    // features, already brings javax.inject, so nothing has to be re-exported.
+    implementation(libs.javax.inject)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
