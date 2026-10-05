@@ -19,6 +19,9 @@ android {
 
     defaultConfig {
         minSdk = 24
+
+        // Rules shipped inside the AAR and applied to the app that uses the SDK. See the file.
+        consumerProguardFiles("consumer-rules.keep")
     }
 
 }

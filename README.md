@@ -63,6 +63,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 | [docs/sample-app.md](docs/sample-app.md) | The sample app: features, modules, use cases and how paging works, flavors, deep link, Compose practices |
 | [docs/testing.md](docs/testing.md) | **Test strategy, tools, how to run, coverage** |
 | [docs/test-tags.md](docs/test-tags.md) | Test tags for Compose tests and Appium/UiAutomator, how they are exposed, the full list |
+| [docs/r8-proguard.md](docs/r8-proguard.md) | R8 / ProGuard: why the SDK ships no rules, how it was checked on a minified app |
 | [docs/edge-cases.md](docs/edge-cases.md) | What happens in unusual situations, and the test that covers each |
 | [docs/roadmap-and-limitations.md](docs/roadmap-and-limitations.md) | What is done, what I would add, known limitations |
 | [docs/how-this-was-built.md](docs/how-this-was-built.md) | The step-by-step, AI-assisted approach and the decisions along the way |
@@ -89,6 +90,20 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 ```
 
 See [docs/testing.md](docs/testing.md) for what each test suite covers and how to see the coverage.
+
+**Try the deep link** from a terminal (with the app installed and an emulator or device connected):
+
+```bash
+# mock flavor: ids 1000..1019 exist, works offline
+adb shell am start -a android.intent.action.VIEW -d "stackoverflowdemo://question/1000" \
+  -p com.alexfin90.stackoverflowhomeassignment.mock
+
+# real flavor: the id of an existing question (80007925 exists at the time of writing)
+adb shell am start -a android.intent.action.VIEW -d "stackoverflowdemo://question/80007925" \
+  -p com.alexfin90.stackoverflowhomeassignment
+```
+
+`-p` picks the flavor, because both register the same link. More in [docs/sample-app.md](docs/sample-app.md#deep-link).
 
 ---
 
