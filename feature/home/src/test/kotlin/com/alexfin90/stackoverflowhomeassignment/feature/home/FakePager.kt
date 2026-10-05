@@ -4,6 +4,8 @@ import com.alexfin90.stackoverflowsdk.domain.Question
 import com.alexfin90.stackoverflowsdk.domain.QuestionsPager
 import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerFactory
 import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -13,7 +15,21 @@ class FakePager(val unansweredOnly: Boolean) : QuestionsPager {
     var refreshes = 0
     var loadMores = 0
 
-    override suspend fun refresh() { refreshes++ }
+    /** When set, `refresh` never finishes by itself; `refreshCancelled` tells if it was cancelled. */
+    var hangOnRefresh = false
+    var refreshCancelled = false
+
+    override suspend fun refresh() {
+        refreshes++
+        if (hangOnRefresh) {
+            try {
+                awaitCancellation()
+            } catch (e: CancellationException) {
+                refreshCancelled = true
+                throw e
+            }
+        }
+    }
     override suspend fun loadMore() { loadMores++ }
 }
 

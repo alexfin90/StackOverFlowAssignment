@@ -4,6 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import com.alexfin90.stackoverflowsdk.domain.PagerError
 import com.alexfin90.stackoverflowsdk.domain.PagerStatus
 import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerState
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -23,7 +26,11 @@ class HomeViewModelTest {
 
     private val pagers = FakePagerFactory()
 
-    private fun viewModel(handle: SavedStateHandle = SavedStateHandle()) = HomeViewModel(pagers, handle)
+    // The state is shared Lazily: it only runs while somebody collects it, like the screen does.
+    private fun TestScope.viewModel(handle: SavedStateHandle = SavedStateHandle()) =
+        HomeViewModel(pagers, handle, mainRule.dispatcher).also { vm ->
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
+        }
 
     private fun HomeViewModel.questions() = state.value.content as HomeContent.Questions
 
@@ -126,6 +133,22 @@ class HomeViewModelTest {
         pagers.last.state.value = pagerState(9)
         advanceUntilIdle()
         assertEquals(listOf(9L), vm.questions().items.map { it.id })
+    }
+
+    @Test
+    fun `a filter change cancels the request still running for the old pager`() = runTest(mainRule.dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        pagers.last.hangOnRefresh = true
+        vm.onRetry()
+        advanceUntilIdle()
+        val old = pagers.last
+        assertFalse(old.refreshCancelled)
+
+        vm.onUnansweredToggled()
+        advanceUntilIdle()
+
+        assertTrue(old.refreshCancelled)
     }
 
     @Test

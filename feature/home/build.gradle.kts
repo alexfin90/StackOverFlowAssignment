@@ -32,6 +32,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     // The feature depends on the app domain (use cases), not on the SDK directly.
     implementation(project(":core:domain"))
+    implementation(project(":core:dispatcher"))
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
