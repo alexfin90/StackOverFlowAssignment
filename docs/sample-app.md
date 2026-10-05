@@ -169,9 +169,9 @@ adb shell am start -a android.intent.action.VIEW \
   -d "stackoverflowdemo://question/1000" \
   -p com.alexfin90.stackoverflowhomeassignment.mock
 
-# real flavor: use any StackOverflow question id, e.g. the number in a question URL
+# real flavor: use the id of an existing question (the number in its URL); 80007925 exists at the time of writing
 adb shell am start -a android.intent.action.VIEW \
-  -d "stackoverflowdemo://question/80007692" \
+  -d "stackoverflowdemo://question/80007925" \
   -p com.alexfin90.stackoverflowhomeassignment
 ```
 

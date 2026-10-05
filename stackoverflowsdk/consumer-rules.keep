@@ -1,0 +1,14 @@
+# R8 / ProGuard rules that travel WITH the SDK and are applied to the app that uses it.
+#
+# There are no active rules, on purpose. Checked by building an app with R8 enabled and no rules of
+# our own, then using it (list, filter, detail, deep link, offline and retry): everything works.
+#   - Retrofit, OkHttp and kotlinx.serialization already ship their own rules inside their jars
+#     (META-INF/proguard/*.pro), so the networking and the JSON of our @Serializable classes are covered.
+#   - The public API is NOT kept: if the host does not use a class, R8 removes it. Keeping the whole
+#     API would stop the host from shrinking it and make its binary bigger.
+#
+# Add a rule here only for something that breaks in a minified app, for example a class that the SDK
+# loads by name. A wrapper (React Native, Flutter, Cordova) that calls the SDK by reflection must keep
+# what it calls in its own rules, not here.
+#
+# See docs/r8-proguard.md for how this was checked and how to check it again.
