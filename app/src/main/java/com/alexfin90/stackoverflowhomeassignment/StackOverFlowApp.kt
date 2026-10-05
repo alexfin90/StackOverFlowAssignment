@@ -66,6 +66,7 @@ private fun StackOverFlowAppContent(
             AppTopBar(
                 title = stringResource(topBar.destination.titleRes()),
                 onBack = if (topBar.showBack) ({ navController.popBackStack() }) else null,
+                backLabel = stringResource(R.string.back),
             )
         },
     ) { innerPadding ->
@@ -80,10 +81,11 @@ private fun StackOverFlowAppContent(
 }
 
 private fun NavDestination?.toAppDestination(): AppDestination = when {
-    this?.hasRoute<Route.QuestionsList>() == true -> AppDestination.Home
+    this?.hasRoute<Route.QuestionDetail>() == true -> AppDestination.Detail
     else -> AppDestination.Home
 }
 
 private fun AppDestination.titleRes(): Int = when (this) {
     AppDestination.Home -> R.string.title_home
+    AppDestination.Detail -> R.string.title_detail
 }

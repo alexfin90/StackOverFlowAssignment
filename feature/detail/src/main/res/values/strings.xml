@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_open_in_browser">Open in browser</string>
+    <string name="detail_retry">Retry</string>
+    <string name="detail_error_network">No connection. Check your network and try again.</string>
+    <string name="detail_error_server">Stack Overflow is not responding properly. Try again later.</string>
+    <string name="detail_not_found">This question does not exist anymore.</string>
+    <string name="detail_unknown_author">unknown</string>
+    <string name="detail_meta">Asked by %1$s · %2$s</string>
+    <string name="detail_score">Score: %d</string>
+    <plurals name="detail_answers">
+        <item quantity="one">%d answer</item>
+        <item quantity="other">%d answers</item>
+    </plurals>
+</resources>

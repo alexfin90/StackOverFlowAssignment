@@ -18,6 +18,7 @@ class MainViewModel @Inject constructor() : ViewModel(), MainViewModelContract {
         _topBar.value = when (destination) {
             // The start destination has no back arrow.
             AppDestination.Home -> TopBarUiState(destination = AppDestination.Home, showBack = false)
+            AppDestination.Detail -> TopBarUiState(destination = AppDestination.Detail, showBack = true)
         }
     }
 }

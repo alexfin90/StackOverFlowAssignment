@@ -22,4 +22,19 @@ class MainViewModelTest {
 
         assertEquals(TopBarUiState(AppDestination.Home, showBack = false), viewModel.topBar.value)
     }
+
+    @Test
+    fun `detail shows a back arrow`() {
+        viewModel.onDestinationChanged(AppDestination.Detail)
+
+        assertEquals(TopBarUiState(AppDestination.Detail, showBack = true), viewModel.topBar.value)
+    }
+
+    @Test
+    fun `going back to home hides the arrow again`() {
+        viewModel.onDestinationChanged(AppDestination.Detail)
+        viewModel.onDestinationChanged(AppDestination.Home)
+
+        assertFalse(viewModel.topBar.value.showBack)
+    }
 }

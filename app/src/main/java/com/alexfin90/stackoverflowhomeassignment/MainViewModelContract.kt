@@ -5,7 +5,7 @@ import androidx.compose.runtime.Stable
 import kotlinx.coroutines.flow.StateFlow
 
 /** The destinations of the app, as far as the shared top bar is concerned. */
-enum class AppDestination { Home }
+enum class AppDestination { Home, Detail }
 
 /** What the shared top bar shows. The title is a destination, not a string: the UI resolves it. */
 @Immutable
