@@ -2,7 +2,7 @@
 
 # Testing
 
-94 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
+95 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
 what is tested at each layer, with which tools, how to run it, and how to see the coverage.
 
 - [Strategy](#strategy)
@@ -12,6 +12,8 @@ what is tested at each layer, with which tools, how to run it, and how to see th
 - [How to run the tests](#how-to-run-the-tests)
 - [Coverage](#coverage)
 - [What is not tested](#what-is-not-tested)
+
+For the test tags used by the UI tests and by QA automation, see [test-tags.md](test-tags.md).
 
 ## Strategy
 
@@ -24,7 +26,7 @@ is on **many fast unit tests of the logic** and **few tests that exercise the re
      some          Remote data source against a local server: what goes on the wire,
     ───────        how each failure becomes a result (11 tests)
    many            Everything else against fakes: repository, decorator, facade, config,
-  ─────────        mapper, ViewModels, Compose screens, routes and the top bar (80 tests)
+  ─────────        mapper, ViewModels, Compose screens, routes and the top bar (81 tests)
 ```
 
 Rules followed everywhere:
@@ -43,11 +45,11 @@ Rules followed everywhere:
 | `:stackoverflowsdk:data` | 36 | mapper (5), remote data source (11), repository (9), logging decorator (8), end-to-end wiring (3) |
 | `:stackoverflowsdk:api` | 6 | configuration defaults and validation |
 | `:stackoverflowsdk` | 12 | `initialize`, `warmUp`, shared instance, concurrency, `create()` |
-| `:core:designsystem` | 7 | components (Compose UI), title alignment, top bar |
+| `:core:designsystem` | 8 | components (Compose UI), title alignment, top bar, test tags exposed as `resource-id` |
 | `:feature:home` | 19 | 11 ViewModel + 6 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:feature:detail` | 10 | 4 ViewModel + 4 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:app` | 4 | `MainViewModel`: top bar state per destination |
-| **Total** | **94** | |
+| **Total** | **95** | |
 
 ## Tools, and why
 
@@ -145,8 +147,8 @@ would add (see [What is not tested](#what-is-not-tested)).
 - `HomeScreenTest` (6) and `DetailScreenTest` (4): the happy path (list, click, filter chip, content,
   open link) and the unhappy path (network error with retry, server error, not found).
 - `DetailViewModelTest` (4): id read from the route, not found, error then retry, API error.
-- `ComponentsTest` (7): each design system component, the alignment of titles in the list, and the
-  top bar (title; back arrow only when a handler is given).
+- `ComponentsTest` (8): each design system component, the alignment of titles in the list, the
+  top bar (title; back arrow only when a handler is given) and the test tag switch.
 
 ## Techniques worth knowing
 
@@ -245,6 +247,8 @@ say more about quality.
 
 ## What is not tested
 
+- **No Appium / end-to-end suite.** The groundwork exists (stable [test tags](test-tags.md) exposed
+  as `resource-id` in debug builds, and a `mock` flavor with fixed data) but no suite is included.
 - **No instrumented tests.** Hilt wiring, navigation between screens and the deep link are not
   exercised end to end by an automated test. They were checked by hand on an emulator.
 - **No test against the real Stack Exchange API.** It would be slow, flaky and subject to a shared

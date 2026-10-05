@@ -1,6 +1,10 @@
 package com.alexfin90.stackoverflowhomeassignment.core.designsystem
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsPropertiesAndroid
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -127,5 +131,20 @@ class ComponentsTest {
         composeRule.onNodeWithTag(TestTags.TOP_BAR_BACK).performClick()
 
         assertEquals(1, backs)
+    }
+
+    @Test
+    fun exposeTestTagsAsResourceId_marksTheSubtreeForUiAutomator() {
+        composeRule.setContent {
+            Column(Modifier.exposeTestTagsAsResourceId()) {
+                LoadingIndicator()
+            }
+        }
+
+        // The flag is set on exactly one node, the root of the subtree; tags below stay usable.
+        composeRule
+            .onAllNodes(SemanticsMatcher.expectValue(SemanticsPropertiesAndroid.TestTagsAsResourceId, true))
+            .assertCountEquals(1)
+        composeRule.onNodeWithTag(TestTags.LOADING).assertIsDisplayed()
     }
 }

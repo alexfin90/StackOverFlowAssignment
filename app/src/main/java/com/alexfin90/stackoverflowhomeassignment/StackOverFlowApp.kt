@@ -17,6 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.alexfin90.stackoverflowhomeassignment.core.common.navigation.Route
+import com.alexfin90.stackoverflowhomeassignment.core.designsystem.exposeTestTagsAsResourceId
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.AppTopBar
 import com.alexfin90.stackoverflowhomeassignment.navigation.appNavGraph
 
@@ -61,7 +62,10 @@ private fun StackOverFlowAppContent(
     }
 
     Scaffold(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            // Test tags become resource-ids for UiAutomator/Appium, in debug builds only.
+            .then(if (BuildConfig.DEBUG) Modifier.exposeTestTagsAsResourceId() else Modifier),
         topBar = {
             AppTopBar(
                 title = stringResource(topBar.destination.titleRes()),

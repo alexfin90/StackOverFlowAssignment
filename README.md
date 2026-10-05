@@ -9,7 +9,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 
 > **Status.** The SDK (`:stackoverflowsdk` + `:api` + `:domain` + `:data`) and the sample app
 > (list with "unanswered" filter, detail screen, deep link, `mock`/`real` flavors) are implemented,
-> with 94 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
+> with 95 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
 > flavor, detail through the deep link on `mock`), but **not on a physical device**, see
 > [known limitations](docs/roadmap-and-limitations.md#known-limitations).
 
@@ -31,6 +31,9 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 - **Explicit timeouts** and **coroutine-cancellation aware**: slow or missing networks fail fast
   as `NetworkError`, cancelled requests stop cleanly.
 - **Unit tests**: `MockWebServer` + Robolectric for the networking layer, plain JUnit elsewhere.
+- **QA-ready**: stable test tags on the key elements, exposed to UiAutomator/Appium as `resource-id`
+  in debug builds, plus a `mock` flavor with fixed data for deterministic end-to-end tests
+  ([docs/test-tags.md](docs/test-tags.md)).
 - **Sample app** with the same modular layout as a production app (`feature:*`, `core:*`), Hilt,
   immutable UI state, `mock`/`real` flavors, a deep link and Compose UI tests that run on the JVM.
 
@@ -59,6 +62,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 | [docs/stackexchange-api.md](docs/stackexchange-api.md) | The Stack Exchange endpoints used and the quirks of the API |
 | [docs/sample-app.md](docs/sample-app.md) | The sample app: features, modules, flavors, deep link, Compose practices |
 | [docs/testing.md](docs/testing.md) | **Test strategy, tools, how to run, coverage** |
+| [docs/test-tags.md](docs/test-tags.md) | Test tags for Compose tests and Appium/UiAutomator, how they are exposed, the full list |
 | [docs/edge-cases.md](docs/edge-cases.md) | What happens in unusual situations, and the test that covers each |
 | [docs/roadmap-and-limitations.md](docs/roadmap-and-limitations.md) | What is done, what I would add, known limitations |
 | [docs/how-this-was-built.md](docs/how-this-was-built.md) | The step-by-step, AI-assisted approach and the decisions along the way |
