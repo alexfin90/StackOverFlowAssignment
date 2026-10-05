@@ -32,7 +32,10 @@ class HomeViewModel @Inject constructor(
     private var loadJob: Job? = null
     private var nextPage = FIRST_PAGE
 
-    /** The questions of the pages loaded so far; the use case adds the next page to them. */
+    /**
+     * The questions of the pages loaded so far. The use case adds the next page to them; on page 1 it
+     * ignores them, so the "start over" rule lives only there.
+     */
     private var loaded: List<Question> = emptyList()
 
     init {
@@ -58,7 +61,6 @@ class HomeViewModel @Inject constructor(
     /** Restarts from page 1. Cancelling the previous job drops any stale in-flight response. */
     private fun refresh() {
         nextPage = FIRST_PAGE
-        loaded = emptyList()
         _state.update { it.copy(content = HomeContent.Loading) }
         load(FIRST_PAGE)
     }
