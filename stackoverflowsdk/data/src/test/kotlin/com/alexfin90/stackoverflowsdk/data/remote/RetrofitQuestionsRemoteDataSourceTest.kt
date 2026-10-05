@@ -151,4 +151,16 @@ class RetrofitQuestionsRemoteDataSourceTest {
         assertTrue(job.isCancelled)
         // runTest also fails on any uncaught exception, so reaching this line means no crash.
     }
+
+    @Test
+    fun `todate is sent when given and omitted when not`() = runTest {
+        server.enqueue(json("""{"items":[],"has_more":false}"""))
+        server.enqueue(json("""{"items":[],"has_more":false}"""))
+
+        remote.getLatestQuestions(fromDate = 1_000, page = 1, pageSize = 20, unansweredOnly = false, toDate = 5_000)
+        remote.getLatestQuestions(fromDate = 1_000, page = 1, pageSize = 20, unansweredOnly = false)
+
+        assertEquals("5000", server.takeRequest().requestUrl!!.queryParameter("todate"))
+        assertEquals(null, server.takeRequest().requestUrl!!.queryParameter("todate"))
+    }
 }

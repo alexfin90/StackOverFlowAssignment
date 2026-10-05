@@ -14,6 +14,8 @@ internal interface QuestionsRemoteDataSource {
         page: Int,
         pageSize: Int,
         unansweredOnly: Boolean,
+        /** When not `null`, only questions created up to this instant (Unix seconds) are returned. */
+        toDate: Long? = null,
     ): RemoteResult<QuestionsResponseDto>
 
     /** Same wrapper as the list: `items` is empty when the id does not exist. */

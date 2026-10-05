@@ -32,6 +32,7 @@ class QuestionsRepositoryImplTest {
             page: Int,
             pageSize: Int,
             unansweredOnly: Boolean,
+            toDate: Long?,
         ): RemoteResult<QuestionsResponseDto> {
             calls += Call(fromDate, page, pageSize, unansweredOnly)
             return result

@@ -15,6 +15,7 @@ internal interface StackExchangeService {
         @Query("fromdate") fromDate: Long, // Unix time in seconds
         @Query("page") page: Int,
         @Query("pagesize") pageSize: Int,
+        @Query("todate") toDate: Long? = null, // omitted when null
         @Query("order") order: String = "desc",
         @Query("sort") sort: String = "creation",
         @Query("site") site: String = "stackoverflow",
@@ -26,6 +27,7 @@ internal interface StackExchangeService {
         @Query("fromdate") fromDate: Long,
         @Query("page") page: Int,
         @Query("pagesize") pageSize: Int,
+        @Query("todate") toDate: Long? = null, // omitted when null
         @Query("order") order: String = "desc",
         @Query("sort") sort: String = "creation",
         @Query("site") site: String = "stackoverflow",
