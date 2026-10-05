@@ -85,9 +85,13 @@ sequenceDiagram
     VM-->>UI: the list grows, a spinner at the bottom meanwhile
 ```
 
-- **One pager per filter.** Toggling "Unanswered" creates a new pager and cancels everything started
-  for the old one (its collector, its refresh, its loadMore, as children of one `Job`), so a late
-  answer of the previous filter can never reach the screen.
+- **One pager per filter.** The screen state is a single flow: the filter is the input and
+  `flatMapLatest` gives each value its own pager. Toggling "Unanswered" cancels the inner flow of the old
+  one, and with it its collector, its refresh and its loadMore, so a late answer of the previous filter
+  can never reach the screen. The mapping to `HomeContent` runs on the injected `@DefaultDispatcher`
+  (`:core:dispatcher`), and the state is shared with `SharingStarted.Lazily`: the pages already loaded
+  stay while the app is in the background, instead of starting again from page 1 as `WhileSubscribed`
+  would after its timeout.
 - **State to screen** (`QuestionsPagerState` -> `HomeContent`):
 
 | Pager state | Screen |
@@ -142,9 +146,9 @@ adb shell am start -a android.intent.action.VIEW \
   -d "stackoverflowdemo://question/1000" \
   -p com.alexfin90.stackoverflowhomeassignment.mock
 
-# real flavor: use any StackOverflow question id, e.g. the number in a question URL
+# real flavor: use the id of an existing question (the number in its URL); 80007925 exists at the time of writing
 adb shell am start -a android.intent.action.VIEW \
-  -d "stackoverflowdemo://question/80007692" \
+  -d "stackoverflowdemo://question/80007925" \
   -p com.alexfin90.stackoverflowhomeassignment
 ```
 
