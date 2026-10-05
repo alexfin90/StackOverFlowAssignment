@@ -63,6 +63,24 @@ about the screen (filter, retry, loading state) and the use cases keep what is a
 The module is pure Kotlin/JVM: its tests (`LoadQuestionsPageUseCaseTest`, `GetQuestionUseCaseTest`)
 run without Robolectric.
 
+#### Why the use cases are in the app and not in the SDK
+
+A fair objection: "the logic to retrieve information must be in the library", so should the page
+merge be in the SDK? The line was drawn like this:
+
+- In the **SDK**: everything about *how to ask StackOverflow* and what a *page* is: the endpoints, the
+  30-day window, the filter, the HTTP errors, the mapping, timeouts. A second app gets all of that
+  for free.
+- In the **app**: what a *screen* needs from pages: a list that grows, and the app's own failure
+  vocabulary (`Network` / `Server`) that the UI turns into messages.
+
+The de-duplication of pages is in between, and it is arguable. It stays in the app because the SDK
+is **stateless on purpose** (`getLatestQuestions` takes a page and returns it, nothing is kept
+between calls): merging pages means *holding* the pages loaded so far, which would add state and
+thread-safety questions to the public API. If a second consumer appeared that needs the same merge, the
+right move would be to offer it from the SDK, for example as a small pager object or a pure
+function that merges two pages, and let the use case call it.
+
 ### How paging and the merge work
 
 The SDK returns **one page at a time**: `getLatestQuestions(unansweredOnly, page)` gives the
