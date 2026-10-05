@@ -1,6 +1,7 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.detail
 
 import androidx.lifecycle.SavedStateHandle
+import com.alexfin90.stackoverflowhomeassignment.core.domain.GetQuestionUseCase
 import com.alexfin90.stackoverflowsdk.domain.Question
 import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
@@ -51,7 +52,7 @@ class DetailViewModelTest {
     @Test
     fun `loads the question whose id comes from the route`() = runTest(dispatcher) {
         val repository = FakeRepository(QuestionResult.Success(question))
-        val vm = DetailViewModel(repository, handle(42))
+        val vm = DetailViewModel(GetQuestionUseCase(repository), handle(42))
 
         assertEquals(DetailUiState.Loading, vm.state.value)
         advanceUntilIdle()
@@ -64,7 +65,7 @@ class DetailViewModelTest {
 
     @Test
     fun `unknown id shows not found`() = runTest(dispatcher) {
-        val vm = DetailViewModel(FakeRepository(QuestionResult.NotFound), handle(1))
+        val vm = DetailViewModel(GetQuestionUseCase(FakeRepository(QuestionResult.NotFound)), handle(1))
         advanceUntilIdle()
 
         assertEquals(DetailUiState.NotFound, vm.state.value)
@@ -73,7 +74,7 @@ class DetailViewModelTest {
     @Test
     fun `network error then retry recovers`() = runTest(dispatcher) {
         val repository = FakeRepository(QuestionResult.NetworkError("offline"))
-        val vm = DetailViewModel(repository, handle(42))
+        val vm = DetailViewModel(GetQuestionUseCase(repository), handle(42))
         advanceUntilIdle()
         assertEquals(DetailUiState.Error(DetailError.Network), vm.state.value)
 
@@ -87,7 +88,7 @@ class DetailViewModelTest {
 
     @Test
     fun `api error maps to server error`() = runTest(dispatcher) {
-        val vm = DetailViewModel(FakeRepository(QuestionResult.ApiError(500, "boom")), handle(1))
+        val vm = DetailViewModel(GetQuestionUseCase(FakeRepository(QuestionResult.ApiError(500, "boom"))), handle(1))
         advanceUntilIdle()
 
         assertEquals(DetailUiState.Error(DetailError.Server), vm.state.value)

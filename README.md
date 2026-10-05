@@ -9,7 +9,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 
 > **Status.** The SDK (`:stackoverflowsdk` + `:api` + `:domain` + `:data`) and the sample app
 > (list with "unanswered" filter, detail screen, deep link, `mock`/`real` flavors) are implemented,
-> with 95 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
+> with 107 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
 > flavor, detail through the deep link on `mock`), but **not on a physical device**, see
 > [known limitations](docs/roadmap-and-limitations.md#known-limitations).
 
@@ -60,7 +60,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 | [docs/sdk-api.md](docs/sdk-api.md) | Public API, initialization rules, logging, coroutine cancellation, design decisions |
 | [docs/dependency-conflicts.md](docs/dependency-conflicts.md) | The main trade-off of using Retrofit, and the alternatives |
 | [docs/stackexchange-api.md](docs/stackexchange-api.md) | The Stack Exchange endpoints used and the quirks of the API |
-| [docs/sample-app.md](docs/sample-app.md) | The sample app: features, modules, flavors, deep link, Compose practices |
+| [docs/sample-app.md](docs/sample-app.md) | The sample app: features, modules, use cases and how paging works, flavors, deep link, Compose practices |
 | [docs/testing.md](docs/testing.md) | **Test strategy, tools, how to run, coverage** |
 | [docs/test-tags.md](docs/test-tags.md) | Test tags for Compose tests and Appium/UiAutomator, how they are exposed, the full list |
 | [docs/edge-cases.md](docs/edge-cases.md) | What happens in unusual situations, and the test that covers each |
@@ -99,6 +99,7 @@ StackOverFlow Home Assignment
 ├── app                       # Sample app: MainActivity, NavHost, Hilt, mock/real flavors
 ├── core
 │   ├── common                # Type-safe routes and deep link base (pure JVM)
+│   ├── domain                # Use cases over the SDK contract (pure JVM)
 │   └── designsystem          # Theme, QuestionRow, filter chip, loading/error/empty states
 ├── feature
 │   ├── home                  # Questions list, filter, paging (ViewModel + screen + tests)

@@ -1,5 +1,6 @@
 package com.alexfin90.stackoverflowhomeassignment
 
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -14,12 +15,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navDeepLink
+import com.alexfin90.stackoverflowhomeassignment.core.common.navigation.DeepLinks
 import com.alexfin90.stackoverflowhomeassignment.core.common.navigation.Route
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.exposeTestTagsAsResourceId
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.AppTopBar
-import com.alexfin90.stackoverflowhomeassignment.navigation.appNavGraph
+import com.alexfin90.stackoverflowhomeassignment.feature.detail.DetailRoute
+import com.alexfin90.stackoverflowhomeassignment.feature.home.HomeRoute
 
 /**
  * Root of the UI, below the theme: `StackOverFlowTheme { StackOverFlowApp() }`.
@@ -43,13 +48,42 @@ fun StackOverFlowApp(
 /**
  * The **only** `Scaffold` of the app: it owns the top bar and the window insets, and the `NavHost`
  * is in its content. The screens inside have no `Scaffold` of their own.
- *
- * The [androidx.navigation.NavHostController] is created here, not received as a parameter: the
- * class is not annotated as stable, so a parameter of that type would be reported as unstable.
  */
 @Composable
 private fun StackOverFlowAppContent(
     topBar: TopBarUiState,
+    onDestinationChanged: (AppDestination) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // The back arrow asks the system for "back": the NavHost below already handles it, so the
+    // Scaffold does not need the navigation controller.
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    Scaffold(
+        modifier = modifier
+            .fillMaxSize()
+            // Test tags become resource-ids for UiAutomator/Appium, in debug builds only.
+            .then(if (BuildConfig.DEBUG) Modifier.exposeTestTagsAsResourceId() else Modifier),
+        topBar = {
+            AppTopBar(
+                title = stringResource(topBar.destination.titleRes()),
+                onBack = if (topBar.showBack) ({ backDispatcher?.onBackPressed() }) else null,
+                backLabel = stringResource(R.string.back),
+            )
+        },
+    ) { innerPadding ->
+        StackOverFlowNavHost(
+            onDestinationChanged = onDestinationChanged,
+            modifier = Modifier.padding(innerPadding),
+        )
+    }
+}
+
+/**
+ * The navigation graph. It creates its own `NavHostController` (no unstable parameter) and only
+ * tells the outside world where the navigation is.
+ */
+@Composable
+private fun StackOverFlowNavHost(
     onDestinationChanged: (AppDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -61,25 +95,24 @@ private fun StackOverFlowAppContent(
         currentOnDestinationChanged(backStackEntry?.destination.toAppDestination())
     }
 
-    Scaffold(
-        modifier = modifier
-            .fillMaxSize()
-            // Test tags become resource-ids for UiAutomator/Appium, in debug builds only.
-            .then(if (BuildConfig.DEBUG) Modifier.exposeTestTagsAsResourceId() else Modifier),
-        topBar = {
-            AppTopBar(
-                title = stringResource(topBar.destination.titleRes()),
-                onBack = if (topBar.showBack) ({ navController.popBackStack() }) else null,
-                backLabel = stringResource(R.string.back),
+    NavHost(
+        modifier = modifier,
+        navController = navController,
+        startDestination = Route.QuestionsList,
+    ) {
+        composable<Route.QuestionsList> {
+            HomeRoute(
+                onQuestionClick = { id -> navController.navigate(Route.QuestionDetail(id)) },
             )
-        },
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Route.QuestionsList,
-            modifier = Modifier.padding(innerPadding),
+        }
+        composable<Route.QuestionDetail>(
+            deepLinks = listOf(
+                // stackoverflowdemo://question/{questionId}
+                navDeepLink<Route.QuestionDetail>(basePath = DeepLinks.QUESTION_DETAIL_BASE),
+            ),
         ) {
-            appNavGraph(navController)
+            // The back arrow is in the shared top bar of the single Scaffold.
+            DetailRoute()
         }
     }
 }

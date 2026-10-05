@@ -2,7 +2,7 @@
 
 # Testing
 
-95 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
+107 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
 what is tested at each layer, with which tools, how to run it, and how to see the coverage.
 
 - [Strategy](#strategy)
@@ -26,7 +26,7 @@ is on **many fast unit tests of the logic** and **few tests that exercise the re
      some          Remote data source against a local server: what goes on the wire,
     ───────        how each failure becomes a result (11 tests)
    many            Everything else against fakes: repository, decorator, facade, config,
-  ─────────        mapper, ViewModels, Compose screens, routes and the top bar (81 tests)
+  ─────────        mapper, ViewModels, Compose screens, routes, the top bar and the use cases (93 tests)
 ```
 
 Rules followed everywhere:
@@ -46,10 +46,11 @@ Rules followed everywhere:
 | `:stackoverflowsdk:api` | 6 | configuration defaults and validation |
 | `:stackoverflowsdk` | 12 | `initialize`, `warmUp`, shared instance, concurrency, `create()` |
 | `:core:designsystem` | 8 | components (Compose UI), title alignment, top bar, test tags exposed as `resource-id` |
-| `:feature:home` | 19 | 11 ViewModel + 6 Compose UI (happy and unhappy paths) + 2 stateful route |
+| `:feature:home` | 20 | 12 ViewModel + 6 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:feature:detail` | 10 | 4 ViewModel + 4 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:app` | 4 | `MainViewModel`: top bar state per destination |
-| **Total** | **95** | |
+| `:core:domain` | 11 | use cases: paging with de-duplication, error translation (plain JVM) |
+| **Total** | **107** | |
 
 ## Tools, and why
 
@@ -136,13 +137,17 @@ would add (see [What is not tested](#what-is-not-tested)).
 
 ### App: ViewModels and screens
 
-- `HomeViewModelTest` (11): initial load, success, empty, network and API errors, retry, filter
+- `HomeViewModelTest` (12): initial load, success, empty, network and API errors, retry, filter
   toggle, filter restored from `SavedStateHandle`, **a stale response is ignored when the filter
   changes**, paging with de-duplication, no request when there are no more pages, a failed "load
-  more" keeps the list.
+  more" keeps the list, and changing the filter after loading more replaces the list
+  instead of appending.
 - `HomeRouteTest` (2) and `DetailRouteTest` (2): the **stateful** route against a fake ViewModel
   contract (no Hilt, no repository), which checks that the state is rendered and that events are
   forwarded. The back arrow is no longer a screen concern: it is in the shared top bar.
+- `LoadQuestionsPageUseCaseTest` (7) and `GetQuestionUseCaseTest` (4): the app domain, on plain JVM
+  with a fake repository: a page is added to the loaded ones, a question coming back in two pages
+  appears once, page 1 starts over, every SDK failure becomes `Network` or `Server`.
 - `MainViewModelTest` (4): the shared top bar state per destination (title, back arrow only on the detail).
 - `HomeScreenTest` (6) and `DetailScreenTest` (4): the happy path (list, click, filter chip, content,
   open link) and the unhappy path (network error with retry, server error, not found).
@@ -176,7 +181,7 @@ would add (see [What is not tested](#what-is-not-tested)).
 All the suites:
 
 ```bash
-./gradlew :stackoverflowsdk:api:test :stackoverflowsdk:testDebugUnitTest \
+./gradlew :core:domain:test :stackoverflowsdk:api:test :stackoverflowsdk:testDebugUnitTest \
   :stackoverflowsdk:data:testDebugUnitTest :core:designsystem:testDebugUnitTest \
   :feature:home:testDebugUnitTest :feature:detail:testDebugUnitTest
 ```

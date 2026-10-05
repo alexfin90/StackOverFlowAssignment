@@ -22,21 +22,119 @@ flowchart TD
     detail[":feature:detail<br/>detail, deep link"]
     ds[":core:designsystem<br/>theme, components"]
     common[":core:common<br/>type-safe routes"]
+    domain[":core:domain<br/>use cases"]
     sdk[":stackoverflowsdk<br/>the SDK"]
 
     app --> home
     app --> detail
     app --> common
     app --> sdk
+    app --> domain
     home --> ds
-    home --> sdk
+    home --> domain
     detail --> ds
     detail --> common
-    detail --> sdk
+    detail --> domain
+    domain --> sdk
 ```
 
 Feature modules never depend on each other: navigation between them lives in `:app`, using the
-routes from `:core:common`.
+routes from `:core:common`. They do not depend on the SDK either: they talk to `:core:domain`, the
+only module between them and the SDK contract (and `:app`, which provides the SDK to Hilt).
+
+### Use cases (`:core:domain`)
+
+Two use cases, both with a reason to exist:
+
+- **`LoadQuestionsPageUseCase`**: loads a page and **adds it to the ones already loaded**, removing
+  duplicates. The SDK returns pages, the screen shows a growing list, and the 30-day window slides
+  between requests, so the same question can come back in two pages. Without the use case this
+  logic would sit in the ViewModel, mixed with the screen state.
+- **`GetQuestionUseCase`**: loads one question.
+
+Both also **translate the SDK results** (`QuestionsResult`, `QuestionResult`) into the app's own
+(`QuestionsPageResult`, `QuestionOutcome`, `LoadFailure`), so the features never see the SDK's
+error types.
+
+What there is **not**: a use case per call. A use case that only forwards one call of the
+repository adds a file and no logic, so those were left out on purpose; the ViewModels keep what is
+about the screen (filter, retry, loading state) and the use cases keep what is about the data.
+
+The module is pure Kotlin/JVM: its tests (`LoadQuestionsPageUseCaseTest`, `GetQuestionUseCaseTest`)
+run without Robolectric.
+
+#### Why the use cases are in the app and not in the SDK
+
+A fair objection: "the logic to retrieve information must be in the library", so should the page
+merge be in the SDK? The line was drawn like this:
+
+- In the **SDK**: everything about *how to ask StackOverflow* and what a *page* is: the endpoints, the
+  30-day window, the filter, the HTTP errors, the mapping, timeouts. A second app gets all of that
+  for free.
+- In the **app**: what a *screen* needs from pages: a list that grows, and the app's own failure
+  vocabulary (`Network` / `Server`) that the UI turns into messages.
+
+The de-duplication of pages is in between, and it is arguable. It stays in the app because the SDK
+is **stateless on purpose** (`getLatestQuestions` takes a page and returns it, nothing is kept
+between calls): merging pages means *holding* the pages loaded so far, which would add state and
+thread-safety questions to the public API. If a second consumer appeared that needs the same merge, the
+right move would be to offer it from the SDK, for example as a small pager object or a pure
+function that merges two pages, and let the use case call it.
+
+### How paging and the merge work
+
+The SDK returns **one page at a time**: `getLatestQuestions(unansweredOnly, page)` gives the
+questions of that page and `hasMore`, which says whether another page exists. The screen shows a
+**growing list**, so something has to join the pieces.
+
+```mermaid
+sequenceDiagram
+    participant UI as HomeScreen
+    participant VM as HomeViewModel
+    participant UC as LoadQuestionsPageUseCase
+    participant SDK as SDK (QuestionsRepository)
+
+    UI->>VM: scrolled near the end (onLoadMore)
+    Note over VM: loaded = questions shown so far,<br/>nextPage = 2
+    VM->>UC: invoke(unansweredOnly, page = 2, alreadyLoaded = loaded)
+    UC->>SDK: getLatestQuestions(unansweredOnly, 2)
+    SDK-->>UC: Success(questions, hasMore)
+    Note over UC: merge: loaded + new, no duplicates
+    UC-->>VM: Success(QuestionsPage(all questions, hasMore))
+    VM-->>UI: new state with the longer list
+```
+
+The merge rule:
+
+- **Page 1** (opening the screen, changing the filter, retry): the new questions **replace** the
+  list; `alreadyLoaded` is ignored.
+- **Page 2 and later**: the new questions are **appended** to the ones already loaded, and
+  `distinctBy { it.id }` removes duplicates, keeping the **first** occurrence so the order does
+  not change.
+
+Why duplicates happen: the list is sorted from the most recent. If someone posts a question while
+the user is scrolling, everything slides down by one position and the last question of a page
+shows up again at the start of the next one. Example with 3 questions per page:
+
+| Step | What the API answers | List shown |
+|---|---|---|
+| Page 1 | `[10, 9, 8]` | `[10, 9, 8]` |
+| (question 11 is posted) | | |
+| Page 2 | `[8, 7, 6]` (the 8 slid down) | `[10, 9, 8, 7, 6]`, not `[10, 9, 8, 8, 7, 6]` |
+
+Without the de-duplication, question 8 would appear twice, and two items with the same `key` in the
+`LazyColumn` (`key = { it.id }`) make the list **crash**.
+
+Two limits, stated openly:
+
+- The new question (11) does not appear until the list is reloaded: de-duplication removes
+  repeats, it does not add news.
+- If a question is **deleted** meanwhile, the items slide **up** and one can be **skipped** between
+  two pages; de-duplication cannot recover it. It is inherent to numbered pages. The window of 30
+  days is also recomputed on each call, see [the API notes](stackexchange-api.md).
+
+The rule is tested alone, without Android: `LoadQuestionsPageUseCaseTest` ("a question that comes
+back in the next page appears once", "page one starts over and ignores what was loaded").
 
 ## Product flavors: `mock` and `real`
 
@@ -103,11 +201,13 @@ adb shell am start -a android.intent.action.VIEW \
   `restartable skippable`.
 - **One `Scaffold` for the whole app**, as `Theme { App }` -> `AppContent` -> `NavHost`:
   `StackOverFlowApp` (stateful: reads a `MainViewModelContract`) -> `StackOverFlowAppContent` (the
-  **only** `Scaffold`, with the top bar; it creates the `NavHostController`, which is not a
-  parameter because that type is reported as unstable) -> the `NavHost` in its content, whose
-  graph is `NavGraphBuilder.appNavGraph(...)`. The screens have no `Scaffold` or top bar of their own. The `MainViewModel` owns
-  the state of the part common to every destination (title and back arrow of the top bar), driven
-  by the current destination.
+  **only** `Scaffold`, with the top bar) -> `StackOverFlowNavHost` (private, in the content of the
+  `Scaffold`; it creates its own `NavHostController`, so no composable takes that unstable type as a
+  parameter, and it only reports the current destination through a callback). The graph is written
+  inside the `NavHost`. The back arrow of the top bar asks the system for "back" instead of using
+  the controller, so the `Scaffold` does not need it. The screens have no `Scaffold` or top bar of
+  their own. The `MainViewModel` owns the state of the part common to every destination (title and
+  back arrow), driven by the current destination.
 - **State hoisting**: a stateful `*Route` (Hilt ViewModel, `collectAsStateWithLifecycle`) wraps a
   stateless `*Screen` that only takes state and callbacks. That makes screens testable and
   previewable.

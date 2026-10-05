@@ -1,6 +1,7 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.home
 
 import androidx.lifecycle.SavedStateHandle
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadQuestionsPageUseCase
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -22,7 +23,7 @@ class HomeViewModelTest {
     private val repository = FakeQuestionsRepository()
 
     private fun viewModel(handle: SavedStateHandle = SavedStateHandle()) =
-        HomeViewModel(repository, handle)
+        HomeViewModel(LoadQuestionsPageUseCase(repository), handle)
 
     private fun HomeViewModel.questions() = state.value.content as HomeContent.Questions
 
@@ -173,5 +174,26 @@ class HomeViewModelTest {
 
         assertEquals(listOf(1L), vm.questions().items.map { it.id })
         assertFalse(vm.questions().isLoadingMore)
+    }
+
+    @Test
+    fun `changing the filter after loading more replaces the list, it does not append`() = runTest(mainRule.dispatcher) {
+        repository.onLatest = { unanswered, page ->
+            when {
+                unanswered -> QuestionsResult.Success(listOf(question(9, answers = 0)), hasMore = false)
+                page == 1 -> QuestionsResult.Success(listOf(question(1), question(2)), hasMore = true)
+                else -> QuestionsResult.Success(listOf(question(3)), hasMore = false)
+            }
+        }
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onLoadMore()
+        advanceUntilIdle()
+        assertEquals(listOf(1L, 2L, 3L), vm.questions().items.map { it.id })
+
+        vm.onUnansweredToggled()
+        advanceUntilIdle()
+
+        assertEquals(listOf(9L), vm.questions().items.map { it.id })
     }
 }

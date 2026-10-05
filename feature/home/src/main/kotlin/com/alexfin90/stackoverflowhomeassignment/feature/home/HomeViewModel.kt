@@ -3,8 +3,11 @@ package com.alexfin90.stackoverflowhomeassignment.feature.home
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
-import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadQuestionsPageUseCase
+import com.alexfin90.stackoverflowhomeassignment.core.domain.QuestionsPage
+import com.alexfin90.stackoverflowhomeassignment.core.domain.QuestionsPageResult
+import com.alexfin90.stackoverflowsdk.domain.Question
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Job
@@ -17,7 +20,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: QuestionsRepository,
+    private val loadQuestionsPage: LoadQuestionsPageUseCase,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel(), HomeViewModelContract {
 
@@ -28,6 +31,12 @@ class HomeViewModel @Inject constructor(
 
     private var loadJob: Job? = null
     private var nextPage = FIRST_PAGE
+
+    /**
+     * The questions of the pages loaded so far. The use case adds the next page to them; on page 1 it
+     * ignores them, so the "start over" rule lives only there.
+     */
+    private var loaded: List<Question> = emptyList()
 
     init {
         refresh()
@@ -60,26 +69,23 @@ class HomeViewModel @Inject constructor(
         loadJob?.cancel()
         val unansweredOnly = _state.value.unansweredOnly
         loadJob = viewModelScope.launch {
-            when (val result = repository.getLatestQuestions(unansweredOnly, page)) {
-                is QuestionsResult.Success -> onSuccess(page, result)
-                is QuestionsResult.NetworkError -> onError(page, ErrorReason.Network)
-                is QuestionsResult.ApiError -> onError(page, ErrorReason.Server)
+            when (val result = loadQuestionsPage(unansweredOnly, page, loaded)) {
+                is QuestionsPageResult.Success -> onSuccess(page, result.page)
+                is QuestionsPageResult.Failure -> onError(page, result.reason.toErrorReason())
             }
         }
     }
 
-    private fun onSuccess(page: Int, result: QuestionsResult.Success) {
+    private fun onSuccess(page: Int, loadedPage: QuestionsPage) {
         nextPage = page + 1
-        val loaded = result.questions.map { it.toItem() }
+        loaded = loadedPage.questions
+        val items = loaded.map { it.toItem() }
         _state.update { current ->
-            val previous = (current.content as? HomeContent.Questions)?.items.orEmpty()
-            // The 30-day window slides between pages, so the same question can appear twice.
-            val all = if (page == FIRST_PAGE) loaded else (previous + loaded).distinctBy { it.id }
             current.copy(
-                content = if (all.isEmpty()) {
+                content = if (items.isEmpty()) {
                     HomeContent.Empty
                 } else {
-                    HomeContent.Questions(all.toImmutableList(), canLoadMore = result.hasMore)
+                    HomeContent.Questions(items.toImmutableList(), canLoadMore = loadedPage.hasMore)
                 },
             )
         }
@@ -101,4 +107,9 @@ class HomeViewModel @Inject constructor(
         const val KEY_UNANSWERED = "unanswered_only"
         const val FIRST_PAGE = 1
     }
+}
+
+private fun LoadFailure.toErrorReason(): ErrorReason = when (this) {
+    LoadFailure.Network -> ErrorReason.Network
+    LoadFailure.Server -> ErrorReason.Server
 }

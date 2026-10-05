@@ -20,6 +20,7 @@ collectionsImmutable = "0.4.0"
 navigationCompose = "2.9.3"
 ksp = "2.3.12"
 androidxHilt = "1.4.0"
+javaInject = "1"
 timber = "5.0.1"
 
 [libraries]
@@ -55,6 +56,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 androidx-compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
+javax-inject = { group = "javax.inject", name = "javax.inject", version.ref = "javaInject" }
 okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
 
 [plugins]

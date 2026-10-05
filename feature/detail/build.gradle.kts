@@ -32,8 +32,8 @@ android {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:common"))
-    // The feature talks to the SDK only through its public contract.
-    implementation(project(":stackoverflowsdk"))
+    // The feature depends on the app domain (use cases), not on the SDK directly.
+    implementation(project(":core:domain"))
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
