@@ -7,8 +7,8 @@ plugins {
 // Consumed only by the :stackoverflowsdk facade, never directly by apps.
 //
 // NOTE: Retrofit/OkHttp are `implementation` on purpose. That hides them at compile time,
-// but at runtime Gradle still unifies versions with the host app (see README, "Dependency
-// conflicts").
+// but at runtime Gradle still unifies versions with the host app (see
+// docs/dependency-conflicts.md).
 kotlin {
     explicitApi()
     jvmToolchain(17)
