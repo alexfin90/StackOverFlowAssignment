@@ -63,6 +63,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 | [docs/sample-app.md](docs/sample-app.md) | The sample app: features, modules, use cases and how paging works, flavors, deep link, Compose practices |
 | [docs/testing.md](docs/testing.md) | **Test strategy, tools, how to run, coverage** |
 | [docs/test-tags.md](docs/test-tags.md) | Test tags for Compose tests and Appium/UiAutomator, how they are exposed, the full list |
+| [docs/r8-proguard.md](docs/r8-proguard.md) | R8 / ProGuard: why the SDK ships no rules, how it was checked on a minified app |
 | [docs/edge-cases.md](docs/edge-cases.md) | What happens in unusual situations, and the test that covers each |
 | [docs/roadmap-and-limitations.md](docs/roadmap-and-limitations.md) | What is done, what I would add, known limitations |
 | [docs/how-this-was-built.md](docs/how-this-was-built.md) | The step-by-step, AI-assisted approach and the decisions along the way |
