@@ -1,6 +1,8 @@
 package com.alexfin90.stackoverflowhomeassignment.di
 
+import com.alexfin90.stackoverflowhomeassignment.fake.FakeQuestionsPagerFactory
 import com.alexfin90.stackoverflowhomeassignment.fake.FakeQuestionsRepository
+import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerFactory
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import dagger.Module
 import dagger.Provides
@@ -19,4 +21,8 @@ object SdkModule {
     @Provides
     @Singleton
     fun provideQuestionsRepository(): QuestionsRepository = FakeQuestionsRepository()
+
+    @Provides
+    @Singleton
+    fun provideQuestionsPagerFactory(): QuestionsPagerFactory = FakeQuestionsPagerFactory()
 }

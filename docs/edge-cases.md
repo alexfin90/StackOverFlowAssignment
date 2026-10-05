@@ -13,6 +13,9 @@ What happens in the unusual situations, and where it is covered.
 | Body that is not valid JSON | `ApiError(null, ...)`, never an exception | malformed body test |
 | API adds or omits fields | Unknown fields ignored; optional ones have defaults (e.g. no `owner`) | success mapping, mapper tests |
 | Title with HTML entities (`&#39;`, `&amp;`) | Decoded to plain text | `QuestionMapperTest` |
+| `loadMore` called many times at once (every scroll event) | One request; the extra calls return immediately | `concurrent loadMore calls make a single request...` |
+| Request cancelled (the screen goes away) | The state is restored and the lock released; nothing is thrown to the host | `cancelling a request restores the state...` |
+| Empty result vs. nothing loaded yet | `isLoaded` tells them apart | `an empty result is told apart from nothing loaded yet` |
 | Question id that does not exist | `QuestionResult.NotFound` (the API answers with an empty list) | not found test |
 | Empty result | `Success` with an empty list | unanswered request test |
 | Coroutine cancelled while loading | `CancellationException` is rethrown, never turned into a result | design (see [Coroutine cancellation](sdk-api.md#coroutine-cancellation)) |
@@ -27,10 +30,10 @@ What happens in the unusual situations, and where it is covered.
 | Retry after an error | Back to loading, then content | network error then retry tests |
 | Server/API error | Separate message ("not responding properly") with Retry | API error tests |
 | No questions (e.g. unanswered filter on a quiet day) | Empty state | empty result tests |
-| Filter changed while a request is in flight | The old request is cancelled, a slow stale response cannot overwrite the new list | `stale response is ignored...` |
-| Scrolling to the end | Next page loads once; nothing is requested when there are no more pages | load more tests |
-| Page 2 fails | The list already shown is kept; scrolling to the end tries again | `failed load more keeps the list` |
-| Same question in two pages (the 30-day window slides) | De-duplicated by id | load more test |
+| Filter changed while a request is in flight | One pager per filter: the old one is cancelled with everything started for it, a late answer cannot reach the screen | `the old pager can no longer reach the screen after a filter change` |
+| Scrolling to the end | Next page loads once; extra calls return at once; nothing is requested when there are no more pages | `concurrent loadMore calls...`, `loadMore does nothing without a next page` (pager) |
+| Page 2 fails | The list already shown is kept; the same page is tried again on the next call | `a failed loadMore keeps the list and the same page is tried again` (pager) |
+| A question is posted while the user scrolls | The window is fixed at refresh (`fromdate`/`todate` snapshot), so the pages do not shift; de-duplication by id is a safety net | `every page of a snapshot uses the same window...`, `a repeated question is kept once` |
 | Question without author | Shown as "unknown" | UI formatting |
 | Process death | Filter restored from `SavedStateHandle`; detail id restored from the route | `filter survives recreation...`, detail tests |
 | Deep link to an id that does not exist | Detail "does not exist" state | `DetailViewModelTest` not found |

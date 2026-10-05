@@ -9,7 +9,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 
 > **Status.** The SDK (`:stackoverflowsdk` + `:api` + `:domain` + `:data`) and the sample app
 > (list with "unanswered" filter, detail screen, deep link, `mock`/`real` flavors) are implemented,
-> with 107 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
+> with 123 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
 > flavor, detail through the deep link on `mock`), but **not on a physical device**, see
 > [known limitations](docs/roadmap-and-limitations.md#known-limitations).
 
@@ -28,6 +28,8 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
   with a `warmUp()` the host can run off the main thread. Using the SDK without it is safe.
 - **Optional logging**: off by default, one switch (`loggingEnabled`) that writes to Logcat; the
   log lines never contain content.
+- **Paged list inside the SDK**: `QuestionsPager` exposes a `StateFlow`, joins pages, fixes the date window
+  (snapshot) so nothing shifts while scrolling, serves one request at a time and keeps the list on failure.
 - **Explicit timeouts** and **coroutine-cancellation aware**: slow or missing networks fail fast
   as `NetworkError`, cancelled requests stop cleanly.
 - **Unit tests**: `MockWebServer` + Robolectric for the networking layer, plain JUnit elsewhere.

@@ -39,102 +39,75 @@ flowchart TD
 ```
 
 Feature modules never depend on each other: navigation between them lives in `:app`, using the
-routes from `:core:common`. They do not depend on the SDK either: they talk to `:core:domain`, the
-only module between them and the SDK contract (and `:app`, which provides the SDK to Hilt).
+routes from `:core:common`. They have no Gradle dependency on `:stackoverflowsdk` either: they reach
+the SDK contract (the pager, `Question`, ...) through `:core:domain`, which re-exports it with `api`, and `:app`
+provides the SDK to Hilt.
 
 ### Use cases (`:core:domain`)
 
-Two use cases, both with a reason to exist:
+One use case, **`GetQuestionUseCase`**: it loads a question by id and translates the SDK result
+(`QuestionResult`) into the app's own `QuestionOutcome` / `LoadFailure`, so the detail feature never
+sees the SDK's error types. It is a thin translation; it stays because it is the boundary between
+the app and the SDK contract.
 
-- **`LoadQuestionsPageUseCase`**: loads a page and **adds it to the ones already loaded**, removing
-  duplicates. The SDK returns pages, the screen shows a growing list, and the 30-day window slides
-  between requests, so the same question can come back in two pages. Without the use case this
-  logic would sit in the ViewModel, mixed with the screen state.
-- **`GetQuestionUseCase`**: loads one question.
+What is **not** here:
 
-Both also **translate the SDK results** (`QuestionsResult`, `QuestionResult`) into the app's own
-(`QuestionsPageResult`, `QuestionOutcome`, `LoadFailure`), so the features never see the SDK's
-error types.
+- **A use case for the list.** The paging (joining pages, removing duplicates, one request at a time,
+  what to keep on failure) is done by the SDK's `QuestionsPager`, see below. It used to be a
+  `LoadQuestionsPageUseCase` in the app and was removed when the logic moved into the SDK.
+- A use case per call. One that only forwards a call adds a file and no logic.
 
-What there is **not**: a use case per call. A use case that only forwards one call of the
-repository adds a file and no logic, so those were left out on purpose; the ViewModels keep what is
-about the screen (filter, retry, loading state) and the use cases keep what is about the data.
+The module is pure Kotlin/JVM; `GetQuestionUseCaseTest` runs without Robolectric.
 
-The module is pure Kotlin/JVM: its tests (`LoadQuestionsPageUseCaseTest`, `GetQuestionUseCaseTest`)
-run without Robolectric.
+### Paging: the SDK's `QuestionsPager`
 
-#### Why the use cases are in the app and not in the SDK
-
-A fair objection: "the logic to retrieve information must be in the library", so should the page
-merge be in the SDK? The line was drawn like this:
-
-- In the **SDK**: everything about *how to ask StackOverflow* and what a *page* is: the endpoints, the
-  30-day window, the filter, the HTTP errors, the mapping, timeouts. A second app gets all of that
-  for free.
-- In the **app**: what a *screen* needs from pages: a list that grows, and the app's own failure
-  vocabulary (`Network` / `Server`) that the UI turns into messages.
-
-The de-duplication of pages is in between, and it is arguable. It stays in the app because the SDK
-is **stateless on purpose** (`getLatestQuestions` takes a page and returns it, nothing is kept
-between calls): merging pages means *holding* the pages loaded so far, which would add state and
-thread-safety questions to the public API. If a second consumer appeared that needs the same merge, the
-right move would be to offer it from the SDK, for example as a small pager object or a pure
-function that merges two pages, and let the use case call it.
-
-### How paging and the merge work
-
-The SDK returns **one page at a time**: `getLatestQuestions(unansweredOnly, page)` gives the
-questions of that page and `hasMore`, which says whether another page exists. The screen shows a
-**growing list**, so something has to join the pieces.
+The list is a `QuestionsPager` from the SDK ([how it works](sdk-api.md#paged-list-questionspager)).
+`HomeViewModel` does not join pages or remove duplicates: it chooses the active pager, asks it to
+load, and turns its state into what the screen shows.
 
 ```mermaid
 sequenceDiagram
     participant UI as HomeScreen
     participant VM as HomeViewModel
-    participant UC as LoadQuestionsPageUseCase
-    participant SDK as SDK (QuestionsRepository)
+    participant P as QuestionsPager (SDK)
+    participant API as Stack Exchange API
 
+    VM->>P: pagers.create(unansweredOnly), then refresh()
+    P->>API: page 1 (fromdate and todate: the snapshot)
+    API-->>P: 30 questions
+    P-->>VM: state(questions, hasMore, Idle)
+    VM-->>UI: HomeUiState
     UI->>VM: scrolled near the end (onLoadMore)
-    Note over VM: loaded = questions shown so far,<br/>nextPage = 2
-    VM->>UC: invoke(unansweredOnly, page = 2, alreadyLoaded = loaded)
-    UC->>SDK: getLatestQuestions(unansweredOnly, 2)
-    SDK-->>UC: Success(questions, hasMore)
-    Note over UC: merge: loaded + new, no duplicates
-    UC-->>VM: Success(QuestionsPage(all questions, hasMore))
-    VM-->>UI: new state with the longer list
+    VM->>P: loadMore()
+    P-->>VM: state(status = LoadingMore)
+    P->>API: page 2 (same fromdate and todate)
+    P-->>VM: state(more questions, Idle)
+    VM-->>UI: the list grows, a spinner at the bottom meanwhile
 ```
 
-The merge rule:
+- **One pager per filter.** Toggling "Unanswered" creates a new pager and cancels everything started
+  for the old one (its collector, its refresh, its loadMore, as children of one `Job`), so a late
+  answer of the previous filter can never reach the screen.
+- **State to screen** (`QuestionsPagerState` -> `HomeContent`):
 
-- **Page 1** (opening the screen, changing the filter, retry): the new questions **replace** the
-  list; `alreadyLoaded` is ignored.
-- **Page 2 and later**: the new questions are **appended** to the ones already loaded, and
-  `distinctBy { it.id }` removes duplicates, keeping the **first** occurrence so the order does
-  not change.
+| Pager state | Screen |
+|---|---|
+| has questions | the list; spinner at the bottom while `LoadingMore`; kept as it is on a refresh or a failed "load more" |
+| no questions, `Failed(Network)` / `Failed(Api)` | error with Retry |
+| no questions, loaded (`isLoaded`) | empty state |
+| no questions, not loaded yet | full-screen spinner |
 
-Why duplicates happen: the list is sorted from the most recent. If someone posts a question while
-the user is scrolling, everything slides down by one position and the last question of a page
-shows up again at the start of the next one. Example with 3 questions per page:
-
-| Step | What the API answers | List shown |
-|---|---|---|
-| Page 1 | `[10, 9, 8]` | `[10, 9, 8]` |
-| (question 11 is posted) | | |
-| Page 2 | `[8, 7, 6]` (the 8 slid down) | `[10, 9, 8, 7, 6]`, not `[10, 9, 8, 8, 7, 6]` |
-
-Without the de-duplication, question 8 would appear twice, and two items with the same `key` in the
-`LazyColumn` (`key = { it.id }`) make the list **crash**.
-
-Two limits, stated openly:
-
-- The new question (11) does not appear until the list is reloaded: de-duplication removes
-  repeats, it does not add news.
-- If a question is **deleted** meanwhile, the items slide **up** and one can be **skipped** between
-  two pages; de-duplication cannot recover it. It is inherent to numbered pages. The window of 30
-  days is also recomputed on each call, see [the API notes](stackexchange-api.md).
-
-The rule is tested alone, without Android: `LoadQuestionsPageUseCaseTest` ("a question that comes
-back in the next page appears once", "page one starts over and ignores what was loaded").
+- **Scrolling.** `LoadMoreEffect` in `HomeScreen.kt` calls `onLoadMore` when the user is within 3
+  items of the end (`snapshotFlow` over the `LazyListState`, so the list is not recomposed on every
+  scroll frame). It is called on every such event; the pager ignores the calls it cannot serve.
+- **No repeats, and why.** The list is ordered from the most recent. If a question is posted while
+  the user scrolls, everything would slide down by one and the last question of a page would come
+  back at the start of the next one (two items with the same `key` crash a `LazyColumn`). The pager
+  avoids it by fixing the window when `refresh` runs: every page of that snapshot is requested with
+  the same `fromdate` and `todate`, so a question posted afterwards is simply outside the window.
+  De-duplicating by id stays as a safety net. A new question appears at the next refresh.
+- **Limits.** A question **deleted** meanwhile makes the items slide up and one can be skipped
+  between two pages. The loaded questions stay in memory for as long as the pager lives.
 
 ## Product flavors: `mock` and `real`
 
