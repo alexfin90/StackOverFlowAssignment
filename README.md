@@ -494,8 +494,8 @@ adb shell am start -a android.intent.action.VIEW \
   the error state with **Retry**.
 - To check that the link is registered: `adb shell pm query-activities --brief -a
   android.intent.action.VIEW -d "stackoverflowdemo://question/1000"` lists the matching apps.
-- Pressing Back after opening the link directly leaves the app (the graph is flat, see
-  [Known limitations](#known-limitations)).
+- After opening the link directly, **both the back arrow and the system Back button go to the
+  list**, they do not leave the app (checked on an emulator, by hand and with `input keyevent BACK`).
 
 ---
 
@@ -659,7 +659,6 @@ Delivered step by step through stacked pull requests.
 ### What I would add with more time (app)
 
 - Instrumented tests (Hilt end to end, navigation, deep link) and screenshot tests
-- Synthetic back stack so that, after opening the deep link, Back goes to the list
 - Show the question body (needs the API `withbody` filter) and answers
 - Offline cache (Room as single source of truth) in the app, keeping the SDK stateless
 - Paging 3 instead of the hand-written paging, if the list grows in complexity
