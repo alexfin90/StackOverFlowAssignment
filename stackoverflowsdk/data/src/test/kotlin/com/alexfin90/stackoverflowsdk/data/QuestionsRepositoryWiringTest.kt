@@ -1,5 +1,6 @@
 package com.alexfin90.stackoverflowsdk.data
 
+import com.alexfin90.stackoverflowsdk.api.StackOverflowLogger
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import kotlinx.coroutines.test.runTest
@@ -82,5 +83,35 @@ class QuestionsRepositoryWiringTest {
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
 
         assertTrue(repository.getLatestQuestions() is QuestionsResult.NetworkError)
+    }
+
+    private fun repositoryWithLogger(logger: StackOverflowLogger) = createQuestionsRepository(
+        baseUrl = server.url("/").toString(),
+        pageSize = 20,
+        lastDays = 30,
+        logger = logger,
+        nowEpochSeconds = { 1_700_000_000L },
+    )
+
+    @Test
+    fun `a host logger receives one line per call, without content`() = runTest {
+        server.enqueue(json(twoQuestions))
+        val lines = mutableListOf<Pair<StackOverflowLogger.Level, String>>()
+
+        repositoryWithLogger { level, message -> lines += level to message }.getLatestQuestions(page = 1)
+
+        val (level, message) = lines.single()
+        assertEquals(StackOverflowLogger.Level.DEBUG, level)
+        assertTrue(message.startsWith("getLatestQuestions(unansweredOnly=false, page=1) -> Success(items=2"))
+        assertFalse(message.contains("Second")) // a title from the response
+    }
+
+    @Test
+    fun `a throwing host logger does not break the request`() = runTest {
+        server.enqueue(json(twoQuestions))
+
+        val result = repositoryWithLogger { _, _ -> error("boom") }.getLatestQuestions()
+
+        assertTrue(result is QuestionsResult.Success)
     }
 }

@@ -27,6 +27,8 @@ the way. The history is in the pull requests of this repository, in order:
 - A separate `:api` module for the public configuration, and `:data` as `implementation` with a
   warning in the build file and in this README.
 - Dropping a `@RequiresOptIn` marker, then dropping a pluggable logger, to keep the public API small.
+  The logger came back later (`StackOverflowLogger`) for the production case: Logcat on the
+  user's phone cannot be read, the host's logger can.
 - A remote data source between the repository and Retrofit, so the repository does not know Retrofit.
 - Naming what the host app sees (`StackOverflowSdk.questions`) while keeping repository naming inside.
 - `initialize` + `warmUp` instead of work at startup on the main thread.

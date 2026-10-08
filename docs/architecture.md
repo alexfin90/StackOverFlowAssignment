@@ -180,7 +180,8 @@ classDiagram
     QuestionsRepositoryImpl --> QuestionsRemoteDataSource
 ```
 
-The factory builds it only when `loggingEnabled` is `true`:
+The factory builds it only when there is somewhere to log: the host's `StackOverflowLogger` if
+given, otherwise Logcat if `loggingEnabled` is `true`:
 `LoggingQuestionsRepository(QuestionsRepositoryImpl(...), sink)`. Why a decorator and not logging
 inside the repository or a subclass:
 

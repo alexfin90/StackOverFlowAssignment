@@ -1,6 +1,7 @@
 package com.alexfin90.stackoverflowsdk
 
 import com.alexfin90.stackoverflowsdk.api.StackOverflowConfig
+import com.alexfin90.stackoverflowsdk.api.StackOverflowLogger
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -82,6 +83,24 @@ class StackOverflowSdkTest {
         StackOverflowSdk.initialize(StackOverflowConfig())
 
         assertTrue(warnings.isEmpty())
+    }
+
+    @Test
+    fun `ignored initialize warns the host logger instead of Logcat`() {
+        val lines = mutableListOf<Pair<StackOverflowLogger.Level, String>>()
+        StackOverflowSdk.initialize(StackOverflowConfig(logger = { level, message -> lines += level to message }))
+
+        StackOverflowSdk.initialize(StackOverflowConfig())
+
+        assertEquals(StackOverflowLogger.Level.WARN, lines.single().first)
+        assertTrue(warnings.isEmpty())
+    }
+
+    @Test
+    fun `a throwing host logger does not break initialize`() {
+        StackOverflowSdk.initialize(StackOverflowConfig(logger = { _, _ -> error("boom") }))
+
+        assertFalse(StackOverflowSdk.initialize(StackOverflowConfig()))
     }
 
     @Test

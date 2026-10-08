@@ -19,6 +19,8 @@ package com.alexfin90.stackoverflowsdk.api
  *   be silent unless the host asks otherwise. When on, one line per request is written to Logcat
  *   with the tag `StackOverflowSdk`: operation, parameters, kind of outcome and duration, never
  *   response content.
+ * @param logger where the lines go instead of Logcat, for example the host's Timber. Setting it
+ *   turns logging on, whatever [loggingEnabled] says. `null` by default.
  */
 public class StackOverflowConfig(
     public val baseUrl: String = DEFAULT_BASE_URL,
@@ -27,6 +29,7 @@ public class StackOverflowConfig(
     public val connectTimeoutSeconds: Long = DEFAULT_CONNECT_TIMEOUT_SECONDS,
     public val callTimeoutSeconds: Long = DEFAULT_CALL_TIMEOUT_SECONDS,
     public val loggingEnabled: Boolean = false,
+    public val logger: StackOverflowLogger? = null,
 ) {
     init {
         require(baseUrl.endsWith("/")) { "baseUrl must end with '/': $baseUrl" }
