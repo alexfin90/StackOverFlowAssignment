@@ -49,10 +49,11 @@ internal class LoggingQuestionsRepository(
         }
     }
 
-    private fun QuestionsResult.logLevel(): LogLevel = when (this) {
+    private fun QuestionsResult.logLevel(): LogLevel =  when (this) {
         is QuestionsResult.Success -> LogLevel.DEBUG
         is QuestionsResult.NetworkError -> LogLevel.WARN
         is QuestionsResult.ApiError -> LogLevel.ERROR
+        is QuestionsResult.RateLimited -> LogLevel.ERROR
     }
 
     private fun QuestionResult.logLevel(): LogLevel = when (this) {
@@ -73,6 +74,7 @@ internal class LoggingQuestionsRepository(
         is QuestionsResult.Success -> "Success(items=${questions.size}, hasMore=$hasMore)"
         is QuestionsResult.NetworkError -> "NetworkError"
         is QuestionsResult.ApiError -> "ApiError(httpCode=$httpCode)"
+        is QuestionsResult.RateLimited -> "RateLimited(retryAfterSeconds=$retryAfterSeconds)"
     }
 
     private companion object {

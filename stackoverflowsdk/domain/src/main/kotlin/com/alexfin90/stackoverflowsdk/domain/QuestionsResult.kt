@@ -22,4 +22,10 @@ public sealed interface QuestionsResult {
      * [httpCode] is `null` when the response could not be parsed.
      */
     public class ApiError(public val httpCode: Int?, public val message: String) : QuestionsResult
+
+    /**
+     * RateLimited
+     */
+    public class RateLimited(public val retryAfterSeconds: Int? = null) : QuestionsResult
+
 }

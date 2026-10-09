@@ -29,7 +29,13 @@ sealed interface HomeContent {
     ) : HomeContent
 }
 
-enum class ErrorReason { Network, Server }
+sealed interface ErrorReason {
+    data object Network : ErrorReason
+    data object Server : ErrorReason
+    data class RateLimited(val retryAfterSeconds: Int? = null) : ErrorReason
+}
+
+/*enum class ErrorReason { Network, Server }*/
 
 /** Presentation model: raw values, formatting with resources is done in the UI layer. */
 @Immutable

@@ -80,16 +80,21 @@ fun HomeScreen(
         when (val content = state.content) {
             HomeContent.Loading -> LoadingIndicator()
             is HomeContent.Error -> ErrorState(
-                message = stringResource(
-                    if (content.reason == ErrorReason.Network) {
-                        R.string.home_error_network
-                    } else {
-                        R.string.home_error_server
+                message =
+                    when (content.reason) {
+                        ErrorReason.Network -> stringResource(R.string.home_error_network)
+                        is ErrorReason.RateLimited ->
+                            content.reason.retryAfterSeconds?.let {
+                                stringResource(R.string.home_error_rate_limited, it)
+                            } ?: stringResource(R.string.home_error_rate_limited)
+
+                        ErrorReason.Server -> stringResource(R.string.home_error_server)
                     },
-                ),
-                retryLabel = stringResource(R.string.home_retry),
+                retryLabel = if (content.reason is ErrorReason.RateLimited) ""
+                else stringResource(R.string.home_retry),
                 onRetry = onRetry,
             )
+
             HomeContent.Empty -> EmptyState(stringResource(R.string.home_empty))
             is HomeContent.Questions -> QuestionsList(
                 content = content,
@@ -111,7 +116,9 @@ private fun QuestionsList(
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize().testTag(TestTags.QUESTIONS_LIST),
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(TestTags.QUESTIONS_LIST),
     ) {
         items(
             items = content.items,
@@ -123,7 +130,11 @@ private fun QuestionsList(
         }
         if (content.isLoadingMore) {
             item(key = "loading_more", contentType = "loading") {
-                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp), contentAlignment = Alignment.Center
+                ) {
                     CircularProgressIndicator()
                 }
             }

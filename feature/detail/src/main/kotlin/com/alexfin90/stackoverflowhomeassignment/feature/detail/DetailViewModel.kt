@@ -51,6 +51,7 @@ class DetailViewModel @Inject constructor(
 private fun LoadFailure.toDetailError(): DetailError = when (this) {
     LoadFailure.Network -> DetailError.Network
     LoadFailure.Server -> DetailError.Server
+    is LoadFailure.RateLimited -> DetailError.RateLimited(retryAfterSeconds)
 }
 
 private fun Question.toDetail() = QuestionDetail(

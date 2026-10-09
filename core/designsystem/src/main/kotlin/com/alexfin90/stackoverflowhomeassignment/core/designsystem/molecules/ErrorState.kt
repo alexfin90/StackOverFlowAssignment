@@ -33,8 +33,10 @@ fun ErrorState(
             color = MaterialTheme.colorScheme.error,
             textAlign = TextAlign.Center,
         )
-        Button(onClick = onRetry, modifier = Modifier.testTag(TestTags.ERROR_RETRY)) {
-            Text(retryLabel)
+        if (retryLabel.isNotBlank()) {
+            Button(onClick = onRetry, modifier = Modifier.testTag(TestTags.ERROR_RETRY)) {
+                Text(retryLabel)
+            }
         }
     }
 }

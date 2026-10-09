@@ -112,4 +112,5 @@ class HomeViewModel @Inject constructor(
 private fun LoadFailure.toErrorReason(): ErrorReason = when (this) {
     LoadFailure.Network -> ErrorReason.Network
     LoadFailure.Server -> ErrorReason.Server
+    is LoadFailure.RateLimited -> ErrorReason.RateLimited(retryAfterSeconds)
 }

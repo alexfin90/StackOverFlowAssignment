@@ -14,7 +14,14 @@ sealed interface DetailUiState {
     data class Content(val question: QuestionDetail) : DetailUiState
 }
 
-enum class DetailError { Network, Server }
+
+sealed interface DetailError {
+    data object Network : DetailError
+    data object Server : DetailError
+    data class RateLimited(val retryAfterSeconds: Int? = null) : DetailError
+}
+
+/*enum class DetailError { Network, Server ,  }*/
 
 @Immutable
 data class QuestionDetail(

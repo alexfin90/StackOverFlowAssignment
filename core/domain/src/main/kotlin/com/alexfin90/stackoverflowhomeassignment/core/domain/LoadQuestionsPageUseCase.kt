@@ -1,5 +1,6 @@
 package com.alexfin90.stackoverflowhomeassignment.core.domain
 
+import com.alexfin90.stackoverflowhomeassignment.core.domain.QuestionsPageResult.*
 import com.alexfin90.stackoverflowsdk.domain.Question
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
@@ -38,14 +39,15 @@ class LoadQuestionsPageUseCase @Inject constructor(
         alreadyLoaded: List<Question> = emptyList(),
     ): QuestionsPageResult =
         when (val result = repository.getLatestQuestions(unansweredOnly, page)) {
-            is QuestionsResult.Success -> QuestionsPageResult.Success(
+            is QuestionsResult.Success -> Success(
                 QuestionsPage(
                     questions = merge(alreadyLoaded, result.questions, page),
                     hasMore = result.hasMore,
                 ),
             )
-            is QuestionsResult.NetworkError -> QuestionsPageResult.Failure(LoadFailure.Network)
-            is QuestionsResult.ApiError -> QuestionsPageResult.Failure(LoadFailure.Server)
+            is QuestionsResult.NetworkError -> Failure(LoadFailure.Network)
+            is QuestionsResult.ApiError -> Failure(LoadFailure.Server)
+            is QuestionsResult.RateLimited -> Failure(LoadFailure.RateLimited(result.retryAfterSeconds))
         }
 
     private fun merge(alreadyLoaded: List<Question>, loaded: List<Question>, page: Int): List<Question> =
