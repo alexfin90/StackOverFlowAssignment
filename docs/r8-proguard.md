@@ -10,10 +10,10 @@ but it only documents this decision.
 
 ## Why no rules are needed
 
-- **The libraries bring their own.** Their jars contain rules that R8 reads automatically:
-  `retrofit2.pro` (Retrofit), `okhttp3.pro` (OkHttp) and `kotlinx-serialization-common.pro`
-  (kotlinx.serialization). Between them they cover the Retrofit interface and its `suspend`
-  functions, OkHttp, and the serializers of our `@Serializable` DTOs, which are loaded by reflection.
+- **The libraries bring their own.** kotlinx.serialization ships `kotlinx-serialization-common.pro`,
+  which R8 reads automatically and which covers the serializers of our `@Serializable` DTOs. The HTTP
+  client is the platform's `HttpURLConnection`, so there is nothing to keep for it. (When the SDK used
+  Retrofit + OkHttp, their jars also brought their own rules.)
 - **Our own code needs none.** The DTOs and the data layer are `internal`: obfuscating them is fine.
   Nothing in the SDK loads a class by name.
 
@@ -29,11 +29,14 @@ what it calls in its own consumer rules: it is the one that knows which names it
 
 ## How it was checked
 
+> The check below was done when the SDK still used Retrofit + OkHttp. After the switch to
+> `HttpURLConnection` it should be repeated with the steps in "How to check it again".
+
 Not assumed: an app was built with R8 enabled and **no rules of our own**, installed on an emulator and used.
 
 | Path in the minified `real` release | Result |
 |---|---|
-| List from the real API (Retrofit + serialization of the DTOs) | 14 questions shown |
+| List from the real API (Retrofit + serialization of the DTOs, at the time of the check) | 14 questions shown |
 | "Unanswered" filter | only "0 answers" |
 | Open a question (a request with a path parameter, DTO deserialized) | detail shown |
 | Deep link `stackoverflowdemo://question/{id}` | detail of a real question |
@@ -80,6 +83,6 @@ rule in `consumer-rules.keep` with a comment saying what breaks without it, and 
 ## Limits
 
 - Checked with the Android Gradle Plugin 9 default (R8 in full mode) and the versions of this project.
-  Another host with another R8 configuration or other versions of Retrofit / OkHttp / kotlinx.serialization
+  Another host with another R8 configuration or other versions of kotlinx.serialization
   is not covered (see [dependency conflicts](dependency-conflicts.md)).
 - Checked by hand on an emulator, not with an automated test.

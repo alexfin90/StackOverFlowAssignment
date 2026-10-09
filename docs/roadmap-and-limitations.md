@@ -39,5 +39,5 @@ Delivered step by step through stacked pull requests.
   de-duplicates by id) or be skipped.
 - Anonymous Stack Exchange requests have a small shared quota; when it is exhausted the app shows
   the server error state. An API key is not used.
-- Retrofit/OkHttp can still clash with the host's versions at runtime, see
+- kotlinx.serialization and kotlinx.coroutines are still runtime dependencies that could clash with the host's versions (much less likely than an HTTP library), see
   [Dependency conflicts](dependency-conflicts.md).

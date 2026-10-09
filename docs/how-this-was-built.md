@@ -28,6 +28,7 @@ the way. The history is in the pull requests of this repository, in order:
   warning in the build file and in this README.
 - Dropping a `@RequiresOptIn` marker, then dropping a pluggable logger, to keep the public API small.
 - A remote data source between the repository and Retrofit, so the repository does not know Retrofit.
+  It paid off later: Retrofit + OkHttp were replaced by `HttpURLConnection` by changing one class.
 - Naming what the host app sees (`StackOverflowSdk.questions`) while keeping repository naming inside.
 - `initialize` + `warmUp` instead of work at startup on the main thread.
 - Only labelling as "design patterns" what really is one.

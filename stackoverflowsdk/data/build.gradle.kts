@@ -6,9 +6,10 @@ plugins {
 // Networking layer: Retrofit service, DTOs, mappers and repository implementation.
 // Consumed only by the :stackoverflowsdk facade, never directly by apps.
 //
-// NOTE: Retrofit/OkHttp are `implementation` on purpose. That hides them at compile time,
-// but at runtime Gradle still unifies versions with the host app (see
-// docs/dependency-conflicts.md).
+// NOTE: no HTTP library on purpose. The transport is the platform's HttpURLConnection, so no
+// HTTP dependency can clash with the host app's versions (see docs/dependency-conflicts.md).
+// The two runtime dependencies left, kotlinx.serialization and kotlinx.coroutines, are
+// `implementation` and very common in host apps.
 kotlin {
     explicitApi()
     jvmToolchain(17)
@@ -31,10 +32,7 @@ android {
 
 dependencies {
     api(project(":stackoverflowsdk:domain"))
-    implementation(libs.retrofit)
-    implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)

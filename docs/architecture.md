@@ -10,7 +10,7 @@ flowchart TD
     sdk[":stackoverflowsdk<br/>facade: StackOverflowSdk"]
     api[":api<br/>StackOverflowConfig<br/>pure Kotlin/JVM"]
     domain[":domain<br/>Question, QuestionsResult,<br/>QuestionsRepository<br/>pure Kotlin/JVM, no deps"]
-    data[":data<br/>Retrofit, DTOs, mapper,<br/>NetworkModule, repository impl<br/>Android library"]
+    data[":data<br/>HttpURLConnection, DTOs, mapper,<br/>NetworkModule, repository impl<br/>Android library"]
 
     app -->|implementation| sdk
     sdk -->|api| api
@@ -32,8 +32,8 @@ sequenceDiagram
     participant App as Host app
     participant Sdk as StackOverflowSdk
     participant Repo as QuestionsRepositoryImpl
-    participant Remote as RetrofitQuestionsRemoteDataSource
-    participant Http as Retrofit / OkHttp
+    participant Remote as UrlConnectionQuestionsRemoteDataSource
+    participant Http as HttpURLConnection
     participant So as Stack Exchange API
 
     App->>Sdk: initialize(config) once, warmUp() off the main thread
@@ -60,14 +60,15 @@ sequenceDiagram
 
 ## Error mapping
 
-Two steps, each with one responsibility. The data source is the only place that knows Retrofit's
+Two steps, each with one responsibility. The data source is the only place that knows the transport's
 exceptions; the repository only knows `RemoteResult`.
 
 ```mermaid
 flowchart LR
-    ex{{"exception in the request"}}
+    ex{{"outcome of the request"}}
     ex -->|CancellationException| rethrow["rethrown<br/>(coroutine cancelled)"]
-    ex -->|HttpException| h["Failure.Http"]
+    ex -->|"status not 2xx"| h["Failure.Http"]
+    ex -->|"call timeout"| n
     ex -->|"IOException<br/>(UnknownHost, Connect, SocketTimeout)"| n["Failure.Network"]
     ex -->|SerializationException| m["Failure.Malformed"]
     ex -->|"any other Exception"| u["Failure.Unexpected"]
@@ -83,9 +84,9 @@ Only the first case leaves the SDK as an exception, and it is handled by the cor
 - `:domain` is pure Kotlin/JVM with **zero third-party dependencies**. The repository contract only
   uses `suspend`, so it does not even expose coroutines.
 - `:data` hides networking, in three small layers: `QuestionsRepositoryImpl` (public results) →
-  `QuestionsRemoteDataSource` (an interface; transport failures as `RemoteResult`) → the Retrofit
-  service. The repository does not import Retrofit, so the HTTP stack can be swapped or faked
-  without touching it. Its only public symbol is `createQuestionsRepository()`.
+  `QuestionsRemoteDataSource` (an interface; transport failures as `RemoteResult`) → the
+  `HttpURLConnection` implementation. The repository does not know the transport, so it was swapped
+  from Retrofit to `HttpURLConnection` without touching it, and it can be faked in tests. Its only public symbol is `createQuestionsRepository()`.
 - `:stackoverflowsdk` is the only module apps declare. It re-exports `:domain` with `api(...)`, so
   integrators get the models without declaring `:domain` themselves, and keeps `:data` as
   `implementation`, so integrators cannot see it.
@@ -94,7 +95,7 @@ Only the first case leaves the SDK as an exception, and it is handled by the cor
 
 > [!IMPORTANT]
 > **`:data` must stay `implementation` in `:stackoverflowsdk/build.gradle.kts`, never `api`.**
-> That single keyword is what keeps Retrofit, OkHttp, the DTOs and `createQuestionsRepository()`
+> That single keyword is what keeps the transport, the DTOs and `createQuestionsRepository()`
 > invisible to host apps. There is no opt-in marker or other safeguard behind it: if it were
 > changed to `api(...)`, they would silently become part of the public API (and a breaking change
 > every time they change). A comment in the build file warns about it, and a code review should
@@ -121,7 +122,7 @@ they are labelled for what they are.
 
 | Pattern | Where | Why |
 |---|---|---|
-| **Facade** | `StackOverflowSdk` | One simple, stable entry point in front of Retrofit, DTOs, mappers and the HTTP client |
+| **Facade** | `StackOverflowSdk` | One simple, stable entry point in front of the HTTP client, DTOs and mappers |
 | **Singleton** (with limits) | `StackOverflowSdk` (`object`) | Configure once at startup (`initialize`) and share one client |
 | **Decorator** | `LoggingQuestionsRepository` | Add logging around the repository without touching it, and only when enabled |
 
@@ -136,7 +137,7 @@ they are labelled for what they are.
 the caller must handle instead of exceptions; mapping functions (`QuestionDto.toDomain()`) keep
 the wire format out of the public model.
 
-**Facade.** The SDK has several moving parts (Retrofit service, DTOs, mappers, HTTP client,
+**Facade.** The SDK has several moving parts (HTTP data source, DTOs, mappers,
 repository). The *facade* pattern hides them behind one simple, stable entry point,
 `StackOverflowSdk`, which hands out a `QuestionsRepository`. The host app does not know what is
 behind it, so internals can change (even the whole HTTP stack) without breaking integrators. For an
