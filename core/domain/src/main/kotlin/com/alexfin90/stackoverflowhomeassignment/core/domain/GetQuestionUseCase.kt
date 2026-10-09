@@ -22,7 +22,6 @@ class GetQuestionUseCase @Inject constructor(
         when (val result = repository.getQuestion(id)) {
             is QuestionResult.Success -> QuestionOutcome.Found(result.question)
             QuestionResult.NotFound -> QuestionOutcome.NotFound
-            is QuestionResult.NetworkError -> QuestionOutcome.Failure(LoadFailure.Network)
-            is QuestionResult.ApiError -> QuestionOutcome.Failure(LoadFailure.Server)
+            is QuestionResult.Failure -> QuestionOutcome.Failure(result.error.toLoadFailure())
         }
 }

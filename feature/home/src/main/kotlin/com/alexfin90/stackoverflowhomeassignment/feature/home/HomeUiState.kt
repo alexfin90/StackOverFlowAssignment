@@ -1,6 +1,7 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.home
 
 import androidx.compose.runtime.Immutable
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
@@ -18,7 +19,7 @@ data class HomeUiState(
 sealed interface HomeContent {
     data object Loading : HomeContent
 
-    data class Error(val reason: ErrorReason) : HomeContent
+    data class Error(val reason: LoadFailure) : HomeContent
 
     data object Empty : HomeContent
 
@@ -28,8 +29,6 @@ sealed interface HomeContent {
         val isLoadingMore: Boolean = false,
     ) : HomeContent
 }
-
-enum class ErrorReason { Network, Server }
 
 /** Presentation model: raw values, formatting with resources is done in the UI layer. */
 @Immutable

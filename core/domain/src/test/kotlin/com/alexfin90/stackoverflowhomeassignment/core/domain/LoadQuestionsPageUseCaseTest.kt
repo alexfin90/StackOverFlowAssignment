@@ -1,6 +1,7 @@
 package com.alexfin90.stackoverflowhomeassignment.core.domain
 
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -62,7 +63,7 @@ class LoadQuestionsPageUseCaseTest {
 
     @Test
     fun `network error becomes a Network failure`() = runTest {
-        repository.onLatest = { _, _ -> QuestionsResult.NetworkError("offline") }
+        repository.onLatest = { _, _ -> QuestionsResult.Failure(SdkError.Network("offline")) }
 
         val result = useCase(unansweredOnly = false, page = 1) as QuestionsPageResult.Failure
 
@@ -71,7 +72,7 @@ class LoadQuestionsPageUseCaseTest {
 
     @Test
     fun `api error becomes a Server failure`() = runTest {
-        repository.onLatest = { _, _ -> QuestionsResult.ApiError(500, "boom") }
+        repository.onLatest = { _, _ -> QuestionsResult.Failure(SdkError.Api(500, "boom")) }
 
         val result = useCase(unansweredOnly = false, page = 1) as QuestionsPageResult.Failure
 

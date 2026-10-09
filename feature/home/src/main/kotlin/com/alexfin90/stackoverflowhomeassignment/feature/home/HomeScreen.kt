@@ -35,6 +35,7 @@ import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.Emp
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.ErrorState
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.QuestionRow
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.UiQuestionRow
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
@@ -80,13 +81,10 @@ fun HomeScreen(
         when (val content = state.content) {
             HomeContent.Loading -> LoadingIndicator()
             is HomeContent.Error -> ErrorState(
-                message = stringResource(
-                    if (content.reason == ErrorReason.Network) {
-                        R.string.home_error_network
-                    } else {
-                        R.string.home_error_server
-                    },
-                ),
+                message = when (content.reason) {
+                    LoadFailure.Network -> stringResource(R.string.home_error_network)
+                    LoadFailure.Server -> stringResource(R.string.home_error_server)
+                },
                 retryLabel = stringResource(R.string.home_retry),
                 onRetry = onRetry,
             )

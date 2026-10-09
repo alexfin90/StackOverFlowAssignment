@@ -44,8 +44,7 @@ class LoadQuestionsPageUseCase @Inject constructor(
                     hasMore = result.hasMore,
                 ),
             )
-            is QuestionsResult.NetworkError -> QuestionsPageResult.Failure(LoadFailure.Network)
-            is QuestionsResult.ApiError -> QuestionsPageResult.Failure(LoadFailure.Server)
+            is QuestionsResult.Failure -> QuestionsPageResult.Failure(result.error.toLoadFailure())
         }
 
     private fun merge(alreadyLoaded: List<Question>, loaded: List<Question>, page: Int): List<Question> =

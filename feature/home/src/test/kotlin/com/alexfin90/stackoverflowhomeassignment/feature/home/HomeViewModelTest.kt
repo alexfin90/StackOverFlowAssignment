@@ -1,8 +1,10 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.home
 
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import androidx.lifecycle.SavedStateHandle
 import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadQuestionsPageUseCase
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -59,10 +61,10 @@ class HomeViewModelTest {
 
     @Test
     fun `network error then retry recovers`() = runTest(mainRule.dispatcher) {
-        repository.onLatest = { _, _ -> QuestionsResult.NetworkError("offline") }
+        repository.onLatest = { _, _ -> QuestionsResult.Failure(SdkError.Network("offline")) }
         val vm = viewModel()
         advanceUntilIdle()
-        assertEquals(HomeContent.Error(ErrorReason.Network), vm.state.value.content)
+        assertEquals(HomeContent.Error(LoadFailure.Network), vm.state.value.content)
 
         repository.onLatest = { _, _ -> QuestionsResult.Success(listOf(question(1)), false) }
         vm.onRetry()
@@ -74,11 +76,11 @@ class HomeViewModelTest {
 
     @Test
     fun `api error maps to server error`() = runTest(mainRule.dispatcher) {
-        repository.onLatest = { _, _ -> QuestionsResult.ApiError(500, "boom") }
+        repository.onLatest = { _, _ -> QuestionsResult.Failure(SdkError.Api(500, "boom")) }
         val vm = viewModel()
         advanceUntilIdle()
 
-        assertEquals(HomeContent.Error(ErrorReason.Server), vm.state.value.content)
+        assertEquals(HomeContent.Error(LoadFailure.Server), vm.state.value.content)
     }
 
     @Test
@@ -163,7 +165,7 @@ class HomeViewModelTest {
             if (page == 1) {
                 QuestionsResult.Success(listOf(question(1)), hasMore = true)
             } else {
-                QuestionsResult.NetworkError("offline")
+                QuestionsResult.Failure(SdkError.Network("offline"))
             }
         }
         val vm = viewModel()

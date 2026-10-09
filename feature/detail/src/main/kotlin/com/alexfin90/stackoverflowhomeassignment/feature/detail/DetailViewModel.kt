@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.alexfin90.stackoverflowhomeassignment.core.common.navigation.Route
 import com.alexfin90.stackoverflowhomeassignment.core.domain.GetQuestionUseCase
-import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import com.alexfin90.stackoverflowhomeassignment.core.domain.QuestionOutcome
 import com.alexfin90.stackoverflowsdk.domain.Question
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,15 +41,10 @@ class DetailViewModel @Inject constructor(
             _state.value = when (val outcome = getQuestion(questionId)) {
                 is QuestionOutcome.Found -> DetailUiState.Content(outcome.question.toDetail())
                 QuestionOutcome.NotFound -> DetailUiState.NotFound
-                is QuestionOutcome.Failure -> DetailUiState.Error(outcome.reason.toDetailError())
+                is QuestionOutcome.Failure -> DetailUiState.Error(outcome.reason)
             }
         }
     }
-}
-
-private fun LoadFailure.toDetailError(): DetailError = when (this) {
-    LoadFailure.Network -> DetailError.Network
-    LoadFailure.Server -> DetailError.Server
 }
 
 private fun Question.toDetail() = QuestionDetail(

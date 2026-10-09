@@ -71,7 +71,7 @@ class HomeViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             when (val result = loadQuestionsPage(unansweredOnly, page, loaded)) {
                 is QuestionsPageResult.Success -> onSuccess(page, result.page)
-                is QuestionsPageResult.Failure -> onError(page, result.reason.toErrorReason())
+                is QuestionsPageResult.Failure -> onError(page, result.reason)
             }
         }
     }
@@ -91,7 +91,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun onError(page: Int, reason: ErrorReason) {
+    private fun onError(page: Int, reason: LoadFailure) {
         _state.update { current ->
             val content = current.content
             when {
@@ -107,9 +107,4 @@ class HomeViewModel @Inject constructor(
         const val KEY_UNANSWERED = "unanswered_only"
         const val FIRST_PAGE = 1
     }
-}
-
-private fun LoadFailure.toErrorReason(): ErrorReason = when (this) {
-    LoadFailure.Network -> ErrorReason.Network
-    LoadFailure.Server -> ErrorReason.Server
 }
