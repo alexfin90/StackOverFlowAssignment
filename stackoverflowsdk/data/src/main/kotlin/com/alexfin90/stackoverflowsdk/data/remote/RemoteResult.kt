@@ -20,5 +20,7 @@ internal sealed interface RemoteResult<out T> {
 
         /** Anything else; a bug or an unforeseen condition, never rethrown. */
         class Unexpected(val message: String) : Failure
+
+        class RateLimited(val retryAfterSeconds: Int? = null) : Failure
     }
 }

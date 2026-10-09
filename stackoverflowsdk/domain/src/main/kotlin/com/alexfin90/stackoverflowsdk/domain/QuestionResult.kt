@@ -13,4 +13,6 @@ public sealed interface QuestionResult {
 
     /** The server answered but the request failed or the payload was unreadable. */
     public class ApiError(public val httpCode: Int?, public val message: String) : QuestionResult
+
+    public class RateLimited(public val retryAfterSeconds: Int? = null) : QuestionResult
 }

@@ -1,5 +1,6 @@
 package com.alexfin90.stackoverflowhomeassignment.core.domain
 
+import com.alexfin90.stackoverflowhomeassignment.core.domain.QuestionOutcome.*
 import com.alexfin90.stackoverflowsdk.domain.Question
 import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
@@ -20,9 +21,10 @@ class GetQuestionUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(id: Long): QuestionOutcome =
         when (val result = repository.getQuestion(id)) {
-            is QuestionResult.Success -> QuestionOutcome.Found(result.question)
+            is QuestionResult.Success -> Found(result.question)
             QuestionResult.NotFound -> QuestionOutcome.NotFound
-            is QuestionResult.NetworkError -> QuestionOutcome.Failure(LoadFailure.Network)
-            is QuestionResult.ApiError -> QuestionOutcome.Failure(LoadFailure.Server)
+            is QuestionResult.NetworkError -> Failure(LoadFailure.Network)
+            is QuestionResult.ApiError -> Failure(LoadFailure.Server)
+            is QuestionResult.RateLimited -> Failure(LoadFailure.RateLimited(result.retryAfterSeconds))
         }
 }

@@ -39,5 +39,5 @@ internal object NetworkModule {
         retrofit.create(StackExchangeService::class.java)
 
     fun provideRemoteDataSource(service: StackExchangeService): QuestionsRemoteDataSource =
-        RetrofitQuestionsRemoteDataSource(service)
+        RetrofitQuestionsRemoteDataSource(service,provideJson())
 }

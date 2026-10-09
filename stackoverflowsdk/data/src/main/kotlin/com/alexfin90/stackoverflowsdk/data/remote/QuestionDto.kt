@@ -25,3 +25,10 @@ internal class QuestionDto(
 internal class OwnerDto(
     @SerialName("display_name") val displayName: String? = null,
 )
+
+/** Error body of the Stack Exchange API: every error comes with HTTP 400, the kind is in error_id. */
+@Serializable
+internal class ErrorResponseDto(
+    @SerialName("error_id") val errorId: Int? = null,
+    @SerialName("error_name") val errorName: String? = null,
+)

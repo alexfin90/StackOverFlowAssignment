@@ -53,13 +53,14 @@ internal class LoggingQuestionsRepository(
         is QuestionsResult.Success -> LogLevel.DEBUG
         is QuestionsResult.NetworkError -> LogLevel.WARN
         is QuestionsResult.ApiError -> LogLevel.ERROR
-        is QuestionsResult.RateLimited -> LogLevel.ERROR
+        is QuestionsResult.RateLimited -> LogLevel.WARN
     }
 
     private fun QuestionResult.logLevel(): LogLevel = when (this) {
         is QuestionResult.Success, QuestionResult.NotFound -> LogLevel.DEBUG
         is QuestionResult.NetworkError -> LogLevel.WARN
         is QuestionResult.ApiError -> LogLevel.ERROR
+        is QuestionResult.RateLimited -> LogLevel.WARN
     }
 
     private fun QuestionResult.describe(): String = when (this) {
@@ -67,6 +68,7 @@ internal class LoggingQuestionsRepository(
         QuestionResult.NotFound -> "NotFound"
         is QuestionResult.NetworkError -> "NetworkError"
         is QuestionResult.ApiError -> "ApiError(httpCode=$httpCode)"
+        is QuestionResult.RateLimited -> "RateLimited(retryAfterSeconds=$retryAfterSeconds)"
     }
 
     // Kind and counts only: no titles, no error messages (they may echo server content).
