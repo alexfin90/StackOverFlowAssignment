@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alexfin90.stackoverflowhomeassignment.core.dispatcher.DefaultDispatcher
-import com.alexfin90.stackoverflowsdk.domain.PagerError
+import com.alexfin90.stackoverflowhomeassignment.core.domain.toLoadFailure
 import com.alexfin90.stackoverflowsdk.domain.PagerStatus
 import com.alexfin90.stackoverflowsdk.domain.QuestionsPager
 import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerFactory
@@ -93,13 +93,8 @@ private fun QuestionsPagerState.toContent(): HomeContent {
             canLoadMore = hasMore,
             isLoadingMore = status == PagerStatus.LoadingMore,
         )
-        status is PagerStatus.Failed -> HomeContent.Error(status.error.toErrorReason())
+        status is PagerStatus.Failed -> HomeContent.Error(status.error.toLoadFailure())
         isLoaded -> HomeContent.Empty
         else -> HomeContent.Loading
     }
-}
-
-private fun PagerError.toErrorReason(): ErrorReason = when (this) {
-    PagerError.Network -> ErrorReason.Network
-    PagerError.Api -> ErrorReason.Server
 }

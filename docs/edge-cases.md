@@ -8,9 +8,9 @@ What happens in the unusual situations, and where it is covered.
 
 | Case | Behaviour | Test |
 |---|---|---|
-| Offline, DNS failure, connect/call timeout | `QuestionsResult.NetworkError` (all are `IOException`s) | `QuestionsRepositoryImplTest`: connection failure, unknown host |
-| HTTP error (4xx/5xx, e.g. quota exhausted) | `ApiError(httpCode, message)` | HTTP error test |
-| Body that is not valid JSON | `ApiError(null, ...)`, never an exception | malformed body test |
+| Offline, DNS failure, connect/call timeout | `Failure(SdkError.Network)` (all are `IOException`s) | `QuestionsRepositoryImplTest`: connection failure, unknown host |
+| HTTP error (4xx/5xx, e.g. quota exhausted) | `Failure(SdkError.Api(httpCode, message))` | HTTP error test |
+| Body that is not valid JSON | `Failure(SdkError.Api(null, ...))`, never an exception | malformed body test |
 | API adds or omits fields | Unknown fields ignored; optional ones have defaults (e.g. no `owner`) | success mapping, mapper tests |
 | Title with HTML entities (`&#39;`, `&amp;`) | Decoded to plain text | `QuestionMapperTest` |
 | `loadMore` called many times at once (every scroll event) | One request; the extra calls return immediately | `concurrent loadMore calls make a single request...` |
@@ -19,7 +19,7 @@ What happens in the unusual situations, and where it is covered.
 | Question id that does not exist | `QuestionResult.NotFound` (the API answers with an empty list) | not found test |
 | Empty result | `Success` with an empty list | unanswered request test |
 | Coroutine cancelled while loading | `CancellationException` is rethrown, never turned into a result | design (see [Coroutine cancellation](sdk-api.md#coroutine-cancellation)) |
-| Unexpected bug inside the SDK | Caught and reported as `ApiError`, so the host app does not crash | design |
+| Unexpected bug inside the SDK | Caught and reported as `SdkError.Api`, so the host app does not crash | design |
 | Invalid configuration (bad URL, page size, timeouts) | `IllegalArgumentException` at construction, fail fast | `StackOverflowConfigTest` |
 
 ## App

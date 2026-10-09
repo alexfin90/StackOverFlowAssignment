@@ -3,10 +3,11 @@ package com.alexfin90.stackoverflowsdk.data
 import com.alexfin90.stackoverflowsdk.data.mapper.toDomain
 import com.alexfin90.stackoverflowsdk.data.remote.QuestionsRemoteDataSource
 import com.alexfin90.stackoverflowsdk.data.remote.RemoteResult
-import com.alexfin90.stackoverflowsdk.domain.PagerError
+import com.alexfin90.stackoverflowsdk.data.remote.toSdkError
 import com.alexfin90.stackoverflowsdk.domain.PagerStatus
 import com.alexfin90.stackoverflowsdk.domain.QuestionsPager
 import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerState
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -83,11 +84,7 @@ internal class QuestionsPagerImpl(
         }
         when (result) {
             is RemoteResult.Success -> onSuccess(result, page, replace)
-            is RemoteResult.Failure.Network -> onFailure(PagerError.Network)
-            is RemoteResult.Failure.Http,
-            is RemoteResult.Failure.Malformed,
-            is RemoteResult.Failure.Unexpected,
-            -> onFailure(PagerError.Api)
+            is RemoteResult.Failure -> onFailure(result.toSdkError())
         }
     }
 
@@ -101,7 +98,7 @@ internal class QuestionsPagerImpl(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            onFailure(PagerError.Api) // a mapping bug is a value, never a crash
+            onFailure(SdkError.Api(null, e.message ?: e.javaClass.simpleName)) // a mapping bug is a value, never a crash
             return
         }
         nextPage = page + 1
@@ -113,7 +110,7 @@ internal class QuestionsPagerImpl(
     }
 
     /** What was already loaded stays on screen; only the status changes. */
-    private fun onFailure(error: PagerError) {
+    private fun onFailure(error: SdkError) {
         _state.update { it.withStatus(PagerStatus.Failed(error)) }
     }
 

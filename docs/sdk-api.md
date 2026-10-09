@@ -15,9 +15,11 @@ applicationScope.launch { StackOverflowSdk.warmUp() }
 
 // 3. Anywhere:
 when (val result = StackOverflowSdk.questions.getLatestQuestions(unansweredOnly = true, page = 1)) {
-    is QuestionsResult.Success      -> show(result.questions, canLoadMore = result.hasMore)
-    is QuestionsResult.NetworkError -> showOffline(result.message)
-    is QuestionsResult.ApiError     -> showError(result.httpCode, result.message)
+    is QuestionsResult.Success -> show(result.questions, canLoadMore = result.hasMore)
+    is QuestionsResult.Failure -> when (val error = result.error) {
+        is SdkError.Network -> showOffline(error.message)
+        is SdkError.Api     -> showError(error.httpCode, error.message)
+    }
 }
 ```
 
@@ -33,8 +35,9 @@ prefer to own the instance (tests, DI container, several configurations), use
 | `StackOverflowSdk.create(config)` | Independent repository, ignores `initialize`. Keep and reuse the instance. |
 | `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30), `loggingEnabled` (false). Validated at construction. |
 | `QuestionsRepository` | `suspend fun getLatestQuestions(unansweredOnly, page): QuestionsResult` and `suspend fun getQuestion(id): QuestionResult` |
-| `QuestionsResult` | Sealed: `Success(questions, hasMore)` / `NetworkError` / `ApiError(httpCode?, message)` |
-| `QuestionResult` | Same idea for one question: `Success(question)` / `NotFound` / `NetworkError` / `ApiError` |
+| `QuestionsResult` | Sealed: `Success(questions, hasMore)` / `Failure(error)` |
+| `QuestionResult` | Same idea for one question: `Success(question)` / `NotFound` / `Failure(error)` |
+| `SdkError` | Why a call failed, **one hierarchy for every result and for the pager**: `Network(message)` / `Api(httpCode?, message)`. A new kind of error is added in one place. |
 | `StackOverflowSdk.pagers` | Factory of `QuestionsPager`: a paged, growing list with its state (see below). |
 | `QuestionsPager` | `state: StateFlow<QuestionsPagerState>`, `suspend refresh()`, `suspend loadMore()` |
 | `Question` | Plain domain model, independent from the wire format. Title is already HTML-decoded. |
@@ -54,7 +57,7 @@ scope.launch { pager.loadMore() }                      // when the user nears th
 
 `QuestionsPagerState` has the `questions` loaded so far, `hasMore`, `isLoaded` (a page was loaded at
 least once: it tells "nothing yet" from "loaded and empty") and a `status`:
-`Idle`, `Refreshing`, `LoadingMore` or `Failed(Network | Api)`.
+`Idle`, `Refreshing`, `LoadingMore` or `Failed(error)`, where `error` is the same `SdkError` as the repository's.
 
 Rules (all covered by tests; the ones that matter were checked by breaking them on purpose):
 
@@ -66,7 +69,7 @@ Rules (all covered by tests; the ones that matter were checked by breaking them 
 - **A snapshot of "now" is fixed at `refresh()`**: every page is requested with the same `fromdate`
   and `todate`. The window cannot slide while the user scrolls, so a question posted meanwhile
   cannot shift the pages or come back twice. De-duplicating by id is kept as a safety net.
-- **Failures are values**: `Failed(Network)` or `Failed(Api)`. The questions already loaded are kept,
+- **Failures are values**: `Failed(SdkError.Network)` or `Failed(SdkError.Api)`. The questions already loaded are kept,
   and calling again retries the same page.
 - **No threads, no scope**: the calls run in the coroutine of the caller. Cancelling it cancels the
   request and restores the state as it was; the lock is released.
@@ -94,6 +97,32 @@ Trade-offs, stated openly:
   one more version that can clash with the host's, see [dependency conflicts](dependency-conflicts.md).
 - **Memory grows** with the pages loaded; there is no cap.
 - A question **deleted** while scrolling can be skipped between two pages.
+
+### Why one error type
+
+The errors used to be repeated in each result (`QuestionsResult.NetworkError`, `QuestionResult.NetworkError`, ...),
+and the app repeated them again in each screen. Adding one kind of error (for example throttling) meant
+touching six types. Now the SDK has one `SdkError`, wrapped by each result's `Failure` and by the pager's `Failed`, and the app
+translates it in one function (`SdkError.toLoadFailure()` in `:core:domain`), and the screens use
+`LoadFailure` directly. Done after the submission, before any public release: changing the shape of
+public results is a breaking change once hosts depend on it.
+
+### Adding a new kind of error
+
+For example throttling (`error_id` 502 in the body of an HTTP 400). Four places, and the compiler
+points to every other one, because each `when` over a sealed type stops compiling until the new
+case is handled:
+
+1. **SDK contract**: a new case in `SdkError` (`:stackoverflowsdk:domain`), for example
+   `RateLimited(retryAfterSeconds: Int?)`.
+2. **SDK detection**: the data source recognises it and returns a new `RemoteResult.Failure` case;
+   `RemoteResult.Failure.toSdkError()` maps it (one function, used by the repository and the pager). Then the compiler asks for the log level and the
+   description in `LoggingQuestionsRepository`.
+3. **App translation**: a new case in `LoadFailure` and one line in `SdkError.toLoadFailure()`
+   (`:core:domain`).
+4. **App messages**: the compiler asks for the message in `HomeScreen` and `DetailScreen`.
+
+Plus the tests: a MockWebServer response for the detection, one mapping test per layer.
 
 ## Initialization rules
 
@@ -162,12 +191,12 @@ leave the SDK.
   app*, where it will be used.
 - **Timeouts are explicit.** Connect timeout (default 10 s) makes the SDK fail fast on a dead
   network; call timeout (default 30 s) caps the whole request. A timeout is an `IOException`, so it
-  becomes `QuestionsResult.NetworkError`, same as offline or DNS failure (`UnknownHostException`).
+  becomes `SdkError.Network`, same as offline or DNS failure (`UnknownHostException`).
 - **`:data` is an Android library, `:domain` is pure JVM.** Only the contract needs to be
   framework-free. `:data` uses `Html.fromHtml` to decode HTML entities in titles; its tests run
   with Robolectric.
 - **No offline cache.** Out of scope: the SDK stays stateless (a database would add dependencies
   and conflict risk). A cache would live in the app (e.g. Room as source of truth with a fallback
-  on `NetworkError`) or as an optional OkHttp HTTP cache.
+  on `SdkError.Network`) or as an optional OkHttp HTTP cache.
 - **`minSdk` 24**, to keep the SDK integrable by apps with a low minimum.
 - **INTERNET permission** is declared in the SDK manifest and merged into the host app.

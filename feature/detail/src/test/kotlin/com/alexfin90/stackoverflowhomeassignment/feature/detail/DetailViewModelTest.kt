@@ -1,11 +1,13 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.detail
 
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import androidx.lifecycle.SavedStateHandle
 import com.alexfin90.stackoverflowhomeassignment.core.domain.GetQuestionUseCase
 import com.alexfin90.stackoverflowsdk.domain.Question
 import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -73,10 +75,10 @@ class DetailViewModelTest {
 
     @Test
     fun `network error then retry recovers`() = runTest(dispatcher) {
-        val repository = FakeRepository(QuestionResult.NetworkError("offline"))
+        val repository = FakeRepository(QuestionResult.Failure(SdkError.Network("offline")))
         val vm = DetailViewModel(GetQuestionUseCase(repository), handle(42))
         advanceUntilIdle()
-        assertEquals(DetailUiState.Error(DetailError.Network), vm.state.value)
+        assertEquals(DetailUiState.Error(LoadFailure.Network), vm.state.value)
 
         repository.result = QuestionResult.Success(question)
         vm.onRetry()
@@ -88,9 +90,9 @@ class DetailViewModelTest {
 
     @Test
     fun `api error maps to server error`() = runTest(dispatcher) {
-        val vm = DetailViewModel(GetQuestionUseCase(FakeRepository(QuestionResult.ApiError(500, "boom"))), handle(1))
+        val vm = DetailViewModel(GetQuestionUseCase(FakeRepository(QuestionResult.Failure(SdkError.Api(500, "boom")))), handle(1))
         advanceUntilIdle()
 
-        assertEquals(DetailUiState.Error(DetailError.Server), vm.state.value)
+        assertEquals(DetailUiState.Error(LoadFailure.Server), vm.state.value)
     }
 }

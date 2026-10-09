@@ -51,10 +51,10 @@ sequenceDiagram
         Repo-->>App: Success(questions, hasMore)
     else HTTP 4xx/5xx or unreadable body
         Remote-->>Repo: Failure.Http / Failure.Malformed
-        Repo-->>App: ApiError(httpCode?, message)
+        Repo-->>App: Failure(SdkError.Api(httpCode?, message))
     else offline, DNS failure, timeout
         Remote-->>Repo: Failure.Network
-        Repo-->>App: NetworkError(message)
+        Repo-->>App: Failure(SdkError.Network(message))
     end
 ```
 
@@ -71,10 +71,10 @@ flowchart LR
     ex -->|"IOException<br/>(UnknownHost, Connect, SocketTimeout)"| n["Failure.Network"]
     ex -->|SerializationException| m["Failure.Malformed"]
     ex -->|"any other Exception"| u["Failure.Unexpected"]
-    h --> api1["ApiError(httpCode)"]
-    n --> net["NetworkError"]
-    m --> api2["ApiError(null)"]
-    u --> api3["ApiError(null)"]
+    h --> api1["SdkError.Api(httpCode)"]
+    n --> net["SdkError.Network"]
+    m --> api2["SdkError.Api(null)"]
+    u --> api3["SdkError.Api(null)"]
 ```
 
 Only the first case leaves the SDK as an exception, and it is handled by the coroutines runtime.

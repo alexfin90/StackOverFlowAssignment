@@ -1,7 +1,8 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.home
 
 import androidx.lifecycle.SavedStateHandle
-import com.alexfin90.stackoverflowsdk.domain.PagerError
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 import com.alexfin90.stackoverflowsdk.domain.PagerStatus
 import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerState
 import kotlinx.coroutines.launch
@@ -82,13 +83,13 @@ class HomeViewModelTest {
         val vm = viewModel()
         advanceUntilIdle()
 
-        pagers.last.state.value = pagerState(isLoaded = false, status = PagerStatus.Failed(PagerError.Network))
+        pagers.last.state.value = pagerState(isLoaded = false, status = PagerStatus.Failed(SdkError.Network("offline")))
         advanceUntilIdle()
-        assertEquals(HomeContent.Error(ErrorReason.Network), vm.state.value.content)
+        assertEquals(HomeContent.Error(LoadFailure.Network), vm.state.value.content)
 
-        pagers.last.state.value = pagerState(isLoaded = false, status = PagerStatus.Failed(PagerError.Api))
+        pagers.last.state.value = pagerState(isLoaded = false, status = PagerStatus.Failed(SdkError.Api(500, "boom")))
         advanceUntilIdle()
-        assertEquals(HomeContent.Error(ErrorReason.Server), vm.state.value.content)
+        assertEquals(HomeContent.Error(LoadFailure.Server), vm.state.value.content)
     }
 
     @Test
@@ -192,7 +193,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         pagers.last.state.value =
-            pagerState(1, 2, hasMore = true, status = PagerStatus.Failed(PagerError.Network))
+            pagerState(1, 2, hasMore = true, status = PagerStatus.Failed(SdkError.Network("offline")))
         advanceUntilIdle()
 
         assertEquals(listOf(1L, 2L), vm.questions().items.map { it.id })

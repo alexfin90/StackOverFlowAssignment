@@ -3,6 +3,7 @@ package com.alexfin90.stackoverflowsdk.data
 import com.alexfin90.stackoverflowsdk.domain.PagerStatus
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -82,7 +83,8 @@ class QuestionsRepositoryWiringTest {
     fun `connection failure maps to NetworkError`() = runTest {
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
 
-        assertTrue(repository.getLatestQuestions() is QuestionsResult.NetworkError)
+        val result = repository.getLatestQuestions() as QuestionsResult.Failure
+        assertTrue(result.error is SdkError.Network)
     }
 
     @Test

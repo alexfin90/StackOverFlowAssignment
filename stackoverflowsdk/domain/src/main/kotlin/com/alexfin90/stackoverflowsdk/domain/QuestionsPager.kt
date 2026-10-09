@@ -64,16 +64,11 @@ public sealed interface PagerStatus {
     /** [QuestionsPager.loadMore] is running. */
     public data object LoadingMore : PagerStatus
 
-    /** The last request failed. The questions already loaded are kept; calling again retries. */
-    public class Failed(public val error: PagerError) : PagerStatus
-}
-
-public enum class PagerError {
-    /** No usable connection. Usually retryable. */
-    Network,
-
-    /** The server answered badly or the answer could not be read. */
-    Api,
+    /**
+     * The last request failed: [error] says why, with the same [SdkError] as the repository's results.
+     * The questions already loaded are kept; calling again retries.
+     */
+    public class Failed(public val error: SdkError) : PagerStatus
 }
 
 /** Creates pagers that share the SDK's HTTP client and configuration. */

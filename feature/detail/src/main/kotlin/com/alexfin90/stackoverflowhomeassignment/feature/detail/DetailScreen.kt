@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.TestTags
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.atoms.LoadingIndicator
 import com.alexfin90.stackoverflowhomeassignment.core.designsystem.molecules.ErrorState
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 
 object DetailTestTags {
     const val OPEN_IN_BROWSER = "detail_open_in_browser"
@@ -66,13 +67,10 @@ fun DetailScreen(
         when (state) {
             DetailUiState.Loading -> LoadingIndicator()
             is DetailUiState.Error -> ErrorState(
-                message = stringResource(
-                    if (state.reason == DetailError.Network) {
-                        R.string.detail_error_network
-                    } else {
-                        R.string.detail_error_server
-                    },
-                ),
+                message = when (state.reason) {
+                    LoadFailure.Network -> stringResource(R.string.detail_error_network)
+                    LoadFailure.Server -> stringResource(R.string.detail_error_server)
+                },
                 retryLabel = stringResource(R.string.detail_retry),
                 onRetry = onRetry,
             )

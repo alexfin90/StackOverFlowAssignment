@@ -20,7 +20,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 - **SDK first**: the app only depends on one artifact, `:stackoverflowsdk`.
 - **Minimal public surface**: one entry point, one config class, one repository interface, one
   model and one result type. Everything else is `internal`.
-- **Never throws across the SDK boundary**: every failure is a `QuestionsResult` case.
+- **Never throws across the SDK boundary**: every failure is a `Failure` with one `SdkError` type, shared by every result.
 - **Explicit API mode** (`explicitApi()`): the compiler forces every public declaration to be
   deliberate.
 - **Multi-module Gradle project**, no convention plugins (kept simple on purpose for a small project).
@@ -31,7 +31,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 - **Paged list inside the SDK**: `QuestionsPager` exposes a `StateFlow`, joins pages, fixes the date window
   (snapshot) so nothing shifts while scrolling, serves one request at a time and keeps the list on failure.
 - **Explicit timeouts** and **coroutine-cancellation aware**: slow or missing networks fail fast
-  as `NetworkError`, cancelled requests stop cleanly.
+  as `SdkError.Network`, cancelled requests stop cleanly.
 - **Unit tests**: `MockWebServer` + Robolectric for the networking layer, plain JUnit elsewhere.
 - **QA-ready**: stable test tags on the key elements, exposed to UiAutomator/Appium as `resource-id`
   in debug builds, plus a `mock` flavor with fixed data for deterministic end-to-end tests

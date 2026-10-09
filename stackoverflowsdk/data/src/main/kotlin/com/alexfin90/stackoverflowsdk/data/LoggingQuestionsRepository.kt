@@ -5,6 +5,7 @@ import com.alexfin90.stackoverflowsdk.data.logging.LogSink
 import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 
 /**
  * Decorator that logs one line per call and delegates everything else: the repository itself
@@ -51,28 +52,34 @@ internal class LoggingQuestionsRepository(
 
     private fun QuestionsResult.logLevel(): LogLevel = when (this) {
         is QuestionsResult.Success -> LogLevel.DEBUG
-        is QuestionsResult.NetworkError -> LogLevel.WARN
-        is QuestionsResult.ApiError -> LogLevel.ERROR
+        is QuestionsResult.Failure -> error.logLevel()
     }
 
     private fun QuestionResult.logLevel(): LogLevel = when (this) {
         is QuestionResult.Success, QuestionResult.NotFound -> LogLevel.DEBUG
-        is QuestionResult.NetworkError -> LogLevel.WARN
-        is QuestionResult.ApiError -> LogLevel.ERROR
+        is QuestionResult.Failure -> error.logLevel()
+    }
+
+    private fun SdkError.logLevel(): LogLevel = when (this) {
+        is SdkError.Network -> LogLevel.WARN
+        is SdkError.Api -> LogLevel.ERROR
     }
 
     private fun QuestionResult.describe(): String = when (this) {
         is QuestionResult.Success -> "Success"
         QuestionResult.NotFound -> "NotFound"
-        is QuestionResult.NetworkError -> "NetworkError"
-        is QuestionResult.ApiError -> "ApiError(httpCode=$httpCode)"
+        is QuestionResult.Failure -> error.describe()
     }
 
     // Kind and counts only: no titles, no error messages (they may echo server content).
     private fun QuestionsResult.describe(): String = when (this) {
         is QuestionsResult.Success -> "Success(items=${questions.size}, hasMore=$hasMore)"
-        is QuestionsResult.NetworkError -> "NetworkError"
-        is QuestionsResult.ApiError -> "ApiError(httpCode=$httpCode)"
+        is QuestionsResult.Failure -> error.describe()
+    }
+
+    private fun SdkError.describe(): String = when (this) {
+        is SdkError.Network -> "NetworkError"
+        is SdkError.Api -> "ApiError(httpCode=$httpCode)"
     }
 
     private companion object {

@@ -5,7 +5,7 @@ import com.alexfin90.stackoverflowsdk.data.remote.QuestionDto
 import com.alexfin90.stackoverflowsdk.data.remote.QuestionsRemoteDataSource
 import com.alexfin90.stackoverflowsdk.data.remote.QuestionsResponseDto
 import com.alexfin90.stackoverflowsdk.data.remote.RemoteResult
-import com.alexfin90.stackoverflowsdk.domain.PagerError
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 import com.alexfin90.stackoverflowsdk.domain.PagerStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -222,7 +222,7 @@ class QuestionsPagerImplTest {
         pager.refresh()
 
         val status = pager.state.value.status as PagerStatus.Failed
-        assertEquals(PagerError.Network, status.error)
+        assertTrue(status.error is SdkError.Network)
         assertTrue(pager.ids().isEmpty())
 
         remote.onCall = { page(1, 2, hasMore = false) }
@@ -243,7 +243,7 @@ class QuestionsPagerImplTest {
 
             pager.refresh()
 
-            assertEquals(PagerError.Api, (pager.state.value.status as PagerStatus.Failed).error)
+            assertTrue((pager.state.value.status as PagerStatus.Failed).error is SdkError.Api)
         }
     }
 

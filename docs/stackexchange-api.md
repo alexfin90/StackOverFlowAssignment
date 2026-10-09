@@ -24,7 +24,7 @@ so API additions do not break the SDK.
 
 Things to know about the API: anonymous requests are rate limited (the quota is small and shared
 per IP), and an exhausted quota or a bad request comes back as an HTTP error with a JSON body,
-which the SDK reports as `QuestionsResult.ApiError`. On the plain repository path the `fromdate` window is
+which the SDK reports as `SdkError.Api`. On the plain repository path the `fromdate` window is
 recomputed on each call, so it slides slightly between pages; the `QuestionsPager` avoids it by sending the same
 `fromdate` and `todate` for every page of a snapshot (`todate` was checked against the real API: only questions up
 to that instant come back).
