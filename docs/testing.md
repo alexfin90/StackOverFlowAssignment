@@ -2,7 +2,7 @@
 
 # Testing
 
-107 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
+123 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
 what is tested at each layer, with which tools, how to run it, and how to see the coverage.
 
 - [Strategy](#strategy)
@@ -21,12 +21,12 @@ An SDK has a slow feedback loop with its users (a bank updates it every few mont
 is on **many fast unit tests of the logic** and **few tests that exercise the real HTTP stack**.
 
 ```
-        few        Wiring: real Retrofit + OkHttp against a local server (3 tests)
+        few        Wiring: real Retrofit + OkHttp against a local server (4 tests)
        ─────
      some          Remote data source against a local server: what goes on the wire,
-    ───────        how each failure becomes a result (11 tests)
+    ───────        how each failure becomes a result (12 tests)
    many            Everything else against fakes: repository, decorator, facade, config,
-  ─────────        mapper, ViewModels, Compose screens, routes, the top bar and the use cases (93 tests)
+  ─────────        mapper, ViewModels, Compose screens, routes, the top bar, the pager and the use case (107 tests)
 ```
 
 Rules followed everywhere:
@@ -42,15 +42,15 @@ Rules followed everywhere:
 
 | Module | Tests | What |
 |---|---|---|
-| `:stackoverflowsdk:data` | 36 | mapper (5), remote data source (11), repository (9), logging decorator (8), end-to-end wiring (3) |
+| `:stackoverflowsdk:data` | 57 | mapper (5), remote data source (12), repository (9), **pager (19)**, logging decorator (8), end-to-end wiring (4) |
 | `:stackoverflowsdk:api` | 6 | configuration defaults and validation |
-| `:stackoverflowsdk` | 12 | `initialize`, `warmUp`, shared instance, concurrency, `create()` |
+| `:stackoverflowsdk` | 14 | `initialize`, `warmUp`, shared instance, concurrency, `create()` |
 | `:core:designsystem` | 8 | components (Compose UI), title alignment, top bar, test tags exposed as `resource-id` |
 | `:feature:home` | 20 | 12 ViewModel + 6 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:feature:detail` | 10 | 4 ViewModel + 4 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:app` | 4 | `MainViewModel`: top bar state per destination |
-| `:core:domain` | 11 | use cases: paging with de-duplication, error translation (plain JVM) |
-| **Total** | **107** | |
+| `:core:domain` | 4 | `GetQuestionUseCase`: found, not found, error translation (plain JVM) |
+| **Total** | **123** | |
 
 ## Tools, and why
 
@@ -122,32 +122,33 @@ would add (see [What is not tested](#what-is-not-tested)).
 | Test class | Uses | Covers |
 |---|---|---|
 | `QuestionMapperTest` (5) | Robolectric | HTML entities (numeric, hex, named, no double decoding), DTO to domain, missing author |
-| `RetrofitQuestionsRemoteDataSourceTest` (11) | MockWebServer | endpoints and query parameters (`fromdate`, `page`, `pagesize`, `sort`, `site`), `no-answers` for the filter, `/questions/{id}`, unknown JSON fields ignored, HTTP error, malformed body, connection failure, unknown host, **cancellation** |
+| `RetrofitQuestionsRemoteDataSourceTest` (12) | MockWebServer | endpoints and query parameters (`fromdate`, `page`, `pagesize`, `sort`, `site`), `no-answers` for the filter, `/questions/{id}`, unknown JSON fields ignored, HTTP error, malformed body, connection failure, unknown host, **cancellation** |
 | `QuestionsRepositoryImplTest` (9) | fake data source + Robolectric | DTO to domain mapping, the 30-day `fromdate` window, parameters passed down, every failure kind mapped to the right public result, `getQuestion` (found, not found, failures) |
+| `QuestionsPagerImplTest` (19) | scripted data source + Robolectric | **refresh and loadMore, states (`Refreshing`/`LoadingMore`/`Idle`/`Failed`), de-duplication, one request at a time (extra `loadMore` calls return at once), `refresh` waiting for a running `loadMore`, failures keeping the list and retrying the same page, cancellation restoring the state and releasing the lock, the snapshot window (same `fromdate`/`todate` for every page, new one at each refresh), `isLoaded`** |
 | `LoggingQuestionsRepositoryTest` (8) | fake repository, fake log sink | exact line format, levels, **no content in the lines**, a failing sink or a cancellation does not break the request, `getQuestion` lines |
-| `QuestionsRepositoryWiringTest` (3) | MockWebServer + Robolectric | the whole chain through the public factory: success, unanswered endpoint, connection failure |
+| `QuestionsRepositoryWiringTest` (4) | MockWebServer + Robolectric | the whole chain through the public factory: success, unanswered endpoint, connection failure, **the pager over one snapshot** (`todate` identical on both pages) |
 
 ### SDK: configuration and facade
 
 - `StackOverflowConfigTest` (6): defaults, logging off by default, every validation rule.
-- `StackOverflowSdkTest` (12): `initialize` is applied once and ignored when repeated or late (with a
+- `StackOverflowSdkTest` (14): `initialize` is applied once and ignored when repeated or late (with a
   warning when logging is on), use without `initialize`, one shared instance, `warmUp` is idempotent,
   **8 threads hitting the shared instance build exactly one**, `create()` is independent, a failing
   log sink cannot break `initialize`.
 
 ### App: ViewModels and screens
 
-- `HomeViewModelTest` (12): initial load, success, empty, network and API errors, retry, filter
-  toggle, filter restored from `SavedStateHandle`, **a stale response is ignored when the filter
-  changes**, paging with de-duplication, no request when there are no more pages, a failed "load
-  more" keeps the list, and changing the filter after loading more replaces the list
-  instead of appending.
+- `HomeViewModelTest` (12): against a **hand-driven pager** (`FakePager`): it starts loading and refreshes the
+  first pager, shows the pager's questions, empty vs not loaded, network and API failures mapped to the
+  right error, retry, toggling the filter creates a new pager and refreshes it, **the old pager can no
+  longer reach the screen after a filter change**, the filter restored from `SavedStateHandle`,
+  `onLoadMore` forwarded, the footer loader while loading more, a failed "load more" and a refresh
+  keeping the list.
 - `HomeRouteTest` (2) and `DetailRouteTest` (2): the **stateful** route against a fake ViewModel
   contract (no Hilt, no repository), which checks that the state is rendered and that events are
   forwarded. The back arrow is no longer a screen concern: it is in the shared top bar.
-- `LoadQuestionsPageUseCaseTest` (7) and `GetQuestionUseCaseTest` (4): the app domain, on plain JVM
-  with a fake repository: a page is added to the loaded ones, a question coming back in two pages
-  appears once, page 1 starts over, every SDK failure becomes `Network` or `Server`.
+- `GetQuestionUseCaseTest` (4): the app domain, on plain JVM with a fake repository: found, not found, every
+  SDK failure becomes `Network` or `Server`.
 - `MainViewModelTest` (4): the shared top bar state per destination (title, back arrow only on the detail).
 - `HomeScreenTest` (6) and `DetailScreenTest` (4): the happy path (list, click, filter chip, content,
   open link) and the unhappy path (network error with retry, server error, not found).
@@ -168,6 +169,10 @@ would add (see [What is not tested](#what-is-not-tested)).
   and turned into a result, a value would exist). `runTest` also fails on any uncaught exception, so
   finishing the test proves the cancellation did not crash. I checked it by removing the `throw e`
   temporarily: the test fails.
+- **Holding a request in flight.** The pager tests use a `CompletableDeferred` as a gate in the scripted data
+  source: the request does not answer until the test releases it, so the state can be checked *while* it is
+  loading, and two `loadMore` calls can overlap on purpose. The three behaviours that matter (one request at
+  a time, the snapshot, cancellation) were verified by breaking each one and watching the matching test fail.
 - **Fakes with a trailing lambda.** In `FakeDelegate` the parameter that tests pass as a trailing
   lambda is the **last** one, because Kotlin binds a trailing lambda to the last parameter.
 - **One `@Before`.** In JUnit 4 the order of several `@Before` methods is not guaranteed, so the

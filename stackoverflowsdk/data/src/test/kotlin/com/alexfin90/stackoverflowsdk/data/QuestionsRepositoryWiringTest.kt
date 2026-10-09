@@ -1,5 +1,6 @@
 package com.alexfin90.stackoverflowsdk.data
 
+import com.alexfin90.stackoverflowsdk.domain.PagerStatus
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
 import com.alexfin90.stackoverflowsdk.domain.SdkError
@@ -84,5 +85,34 @@ class QuestionsRepositoryWiringTest {
 
         val result = repository.getLatestQuestions() as QuestionsResult.Failure
         assertTrue(result.error is SdkError.Network)
+    }
+
+    @Test
+    fun `the pager loads two pages over one snapshot through the real stack`() = runTest {
+        val services = createQuestionsServices(
+            baseUrl = server.url("/").toString(),
+            pageSize = 2,
+            lastDays = 30,
+            nowEpochSeconds = { 1_700_000_000L },
+        )
+        server.enqueue(json("""{"items":[
+            {"question_id":3,"title":"C","link":"l","creation_date":1699999000},
+            {"question_id":2,"title":"B","link":"l","creation_date":1699998000}],"has_more":true}"""))
+        server.enqueue(json("""{"items":[
+            {"question_id":1,"title":"A","link":"l","creation_date":1699997000}],"has_more":false}"""))
+        val pager = services.pagers.create(unansweredOnly = false)
+
+        pager.refresh()
+        pager.loadMore()
+
+        assertEquals(listOf(3L, 2L, 1L), pager.state.value.questions.map { it.id })
+        assertFalse(pager.state.value.hasMore)
+        assertTrue(pager.state.value.status is PagerStatus.Idle)
+        val first = server.takeRequest().requestUrl!!
+        val second = server.takeRequest().requestUrl!!
+        assertEquals("1700000000", first.queryParameter("todate"))
+        assertEquals(first.queryParameter("todate"), second.queryParameter("todate"))
+        assertEquals("1", first.queryParameter("page"))
+        assertEquals("2", second.queryParameter("page"))
     }
 }

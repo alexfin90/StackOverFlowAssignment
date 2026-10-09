@@ -14,8 +14,8 @@ sealed interface LoadFailure {
     data object Server : LoadFailure
 }
 
-/** The only place where the SDK's errors become the app's: both use cases call it. */
-internal fun SdkError.toLoadFailure(): LoadFailure = when (this) {
+/** The only place where the SDK's errors become the app's: the use case and the list screen (pager) call it. */
+fun SdkError.toLoadFailure(): LoadFailure = when (this) {
     is SdkError.Network -> LoadFailure.Network
     is SdkError.Api -> LoadFailure.Server
 }

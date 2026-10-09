@@ -118,4 +118,25 @@ class StackOverflowSdkTest {
 
         assertEquals(1, instances.size)
     }
+
+    @Test
+    fun `pagers is a single shared factory that creates independent pagers`() {
+        assertSame(StackOverflowSdk.pagers, StackOverflowSdk.pagers)
+
+        val a = StackOverflowSdk.pagers.create()
+        val b = StackOverflowSdk.pagers.create(unansweredOnly = true)
+
+        assertNotSame(a, b)
+        assertTrue(a.state.value.questions.isEmpty())
+    }
+
+    @Test
+    fun `pagers and questions are built together over the same configuration`() {
+        StackOverflowSdk.initialize(StackOverflowConfig(pageSize = 10))
+
+        StackOverflowSdk.pagers
+
+        // the configuration is now frozen: it was used
+        assertFalse(StackOverflowSdk.initialize(StackOverflowConfig(pageSize = 50)))
+    }
 }

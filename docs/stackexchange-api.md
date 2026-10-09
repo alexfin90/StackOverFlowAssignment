@@ -15,6 +15,7 @@ Base URL `https://api.stackexchange.com/` (v2.3). Both calls are `GET`, anonymou
 | `site` | `stackoverflow` | Fixed, defines the target site |
 | `sort` / `order` | `creation` / `desc` | Fixed, "latest" means newest first |
 | `fromdate` | now minus `lastDays`, Unix time in **seconds** | Requirement: questions of the last 30 days. 1 day = 86,400 s |
+| `todate` | the snapshot instant, **pager only** | Fixes the end of the window so new questions cannot shift the pages |
 | `page` / `pagesize` | from the caller / `StackOverflowConfig.pageSize` | Paging (`has_more` tells if another page exists) |
 
 Fields read from each item: `question_id`, `title` (HTML-encoded, decoded by the SDK), `link`,
@@ -23,5 +24,7 @@ so API additions do not break the SDK.
 
 Things to know about the API: anonymous requests are rate limited (the quota is small and shared
 per IP), and an exhausted quota or a bad request comes back as an HTTP error with a JSON body,
-which the SDK reports as `SdkError.Api`. The `fromdate` window is recomputed on each
-call, so it slides slightly between pages.
+which the SDK reports as `SdkError.Api`. On the plain repository path the `fromdate` window is
+recomputed on each call, so it slides slightly between pages; the `QuestionsPager` avoids it by sending the same
+`fromdate` and `todate` for every page of a snapshot (`todate` was checked against the real API: only questions up
+to that instant come back).

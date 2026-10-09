@@ -3,108 +3,98 @@ package com.alexfin90.stackoverflowhomeassignment.feature.home
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
-import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadQuestionsPageUseCase
-import com.alexfin90.stackoverflowhomeassignment.core.domain.QuestionsPage
-import com.alexfin90.stackoverflowhomeassignment.core.domain.QuestionsPageResult
-import com.alexfin90.stackoverflowsdk.domain.Question
+import com.alexfin90.stackoverflowhomeassignment.core.dispatcher.DefaultDispatcher
+import com.alexfin90.stackoverflowhomeassignment.core.domain.toLoadFailure
+import com.alexfin90.stackoverflowsdk.domain.PagerStatus
+import com.alexfin90.stackoverflowsdk.domain.QuestionsPager
+import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerFactory
+import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
+/**
+ * The paging itself (joining pages, de-duplicating, one request at a time, what to keep on failure)
+ * lives in the SDK's [QuestionsPager]. This ViewModel only turns the chosen filter into a pager and
+ * the pager's state into what the screen shows.
+ *
+ * The screen state is a single flow: the filter is the input, and `flatMapLatest` gives each value
+ * its own pager. Changing the filter cancels the previous inner flow, and with it the collector, the
+ * refresh and the "load more" of the old pager, so a late answer can never reach the screen.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val loadQuestionsPage: LoadQuestionsPageUseCase,
+    private val pagers: QuestionsPagerFactory,
     private val savedStateHandle: SavedStateHandle,
+    @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel(), HomeViewModelContract {
 
-    private val _state = MutableStateFlow(
-        HomeUiState(unansweredOnly = savedStateHandle[KEY_UNANSWERED] ?: false),
-    )
-    override val state: StateFlow<HomeUiState> = _state.asStateFlow()
+    private val unansweredOnly = savedStateHandle.getStateFlow(KEY_UNANSWERED, false)
 
-    private var loadJob: Job? = null
-    private var nextPage = FIRST_PAGE
+    // Events for the active pager. Dropped if nothing is running, which is fine: they are requests, not state.
+    private val retryRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val loadMoreRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
-    /**
-     * The questions of the pages loaded so far. The use case adds the next page to them; on page 1 it
-     * ignores them, so the "start over" rule lives only there.
-     */
-    private var loaded: List<Question> = emptyList()
-
-    init {
-        refresh()
-    }
+    // Lazily, not WhileSubscribed: the pager and the pages already loaded live as long as the ViewModel,
+    // so coming back from the background does not start again from page 1.
+    override val state: StateFlow<HomeUiState> = unansweredOnly
+        .flatMapLatest { unanswered -> screenState(unanswered) }
+        .flowOn(defaultDispatcher)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Lazily,
+            initialValue = HomeUiState(unansweredOnly = unansweredOnly.value),
+        )
 
     override fun onUnansweredToggled() {
-        val unansweredOnly = !_state.value.unansweredOnly
-        savedStateHandle[KEY_UNANSWERED] = unansweredOnly
-        _state.update { it.copy(unansweredOnly = unansweredOnly) }
-        refresh()
+        savedStateHandle[KEY_UNANSWERED] = !unansweredOnly.value
     }
 
-    override fun onRetry() = refresh()
+    override fun onRetry() {
+        retryRequests.tryEmit(Unit)
+    }
 
+    /** Safe to call on every scroll event: the pager ignores it if it is already loading. */
     override fun onLoadMore() {
-        val content = _state.value.content
-        if (content !is HomeContent.Questions || !content.canLoadMore || content.isLoadingMore) return
-        _state.update { it.copy(content = content.copy(isLoadingMore = true)) }
-        load(nextPage)
+        loadMoreRequests.tryEmit(Unit)
     }
 
-    /** Restarts from page 1. Cancelling the previous job drops any stale in-flight response. */
-    private fun refresh() {
-        nextPage = FIRST_PAGE
-        _state.update { it.copy(content = HomeContent.Loading) }
-        load(FIRST_PAGE)
-    }
-
-    private fun load(page: Int) {
-        loadJob?.cancel()
-        val unansweredOnly = _state.value.unansweredOnly
-        loadJob = viewModelScope.launch {
-            when (val result = loadQuestionsPage(unansweredOnly, page, loaded)) {
-                is QuestionsPageResult.Success -> onSuccess(page, result.page)
-                is QuestionsPageResult.Failure -> onError(page, result.reason)
-            }
-        }
-    }
-
-    private fun onSuccess(page: Int, loadedPage: QuestionsPage) {
-        nextPage = page + 1
-        loaded = loadedPage.questions
-        val items = loaded.map { it.toItem() }
-        _state.update { current ->
-            current.copy(
-                content = if (items.isEmpty()) {
-                    HomeContent.Empty
-                } else {
-                    HomeContent.Questions(items.toImmutableList(), canLoadMore = loadedPage.hasMore)
-                },
-            )
-        }
-    }
-
-    private fun onError(page: Int, reason: LoadFailure) {
-        _state.update { current ->
-            val content = current.content
-            when {
-                // A failed "load more" keeps the list; scrolling to the end tries again.
-                page > FIRST_PAGE && content is HomeContent.Questions ->
-                    current.copy(content = content.copy(isLoadingMore = false))
-                else -> current.copy(content = HomeContent.Error(reason))
-            }
-        }
+    private fun screenState(unanswered: Boolean): Flow<HomeUiState> = channelFlow {
+        val pager = pagers.create(unanswered)
+        launch { pager.refresh() }
+        launch { retryRequests.collect { pager.refresh() } }
+        launch { loadMoreRequests.collect { pager.loadMore() } }
+        pager.state.collect { send(HomeUiState(unanswered, it.toContent())) }
     }
 
     private companion object {
         const val KEY_UNANSWERED = "unanswered_only"
-        const val FIRST_PAGE = 1
+    }
+}
+
+private fun QuestionsPagerState.toContent(): HomeContent {
+    val status = status // a property of another module cannot be smart-cast
+    return when {
+        // With questions to show, a refresh or a failed "load more" keeps them on screen.
+        questions.isNotEmpty() -> HomeContent.Questions(
+            items = questions.map { it.toItem() }.toImmutableList(),
+            canLoadMore = hasMore,
+            isLoadingMore = status == PagerStatus.LoadingMore,
+        )
+        status is PagerStatus.Failed -> HomeContent.Error(status.error.toLoadFailure())
+        isLoaded -> HomeContent.Empty
+        else -> HomeContent.Loading
     }
 }

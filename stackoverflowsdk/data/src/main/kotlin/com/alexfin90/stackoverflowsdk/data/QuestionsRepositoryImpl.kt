@@ -3,6 +3,7 @@ package com.alexfin90.stackoverflowsdk.data
 import com.alexfin90.stackoverflowsdk.data.mapper.toDomain
 import com.alexfin90.stackoverflowsdk.data.remote.QuestionsRemoteDataSource
 import com.alexfin90.stackoverflowsdk.data.remote.RemoteResult
+import com.alexfin90.stackoverflowsdk.data.remote.toSdkError
 import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
@@ -36,14 +37,6 @@ internal class QuestionsRepositoryImpl(
             is RemoteResult.Success -> mapQuestion(result)
             is RemoteResult.Failure -> QuestionResult.Failure(result.toSdkError())
         }
-
-    /** The only place where transport failures become public errors. */
-    private fun RemoteResult.Failure.toSdkError(): SdkError = when (this) {
-        is RemoteResult.Failure.Network -> SdkError.Network(message)
-        is RemoteResult.Failure.Http -> SdkError.Api(code, message)
-        is RemoteResult.Failure.Malformed -> SdkError.Api(null, "Unreadable response: $message")
-        is RemoteResult.Failure.Unexpected -> SdkError.Api(null, message)
-    }
 
     private fun mapQuestion(result: RemoteResult.Success<com.alexfin90.stackoverflowsdk.data.remote.QuestionsResponseDto>): QuestionResult =
         try {

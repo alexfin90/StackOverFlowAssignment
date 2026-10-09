@@ -15,11 +15,12 @@ internal class RetrofitQuestionsRemoteDataSource(
         page: Int,
         pageSize: Int,
         unansweredOnly: Boolean,
+        toDate: Long?,
     ): RemoteResult<QuestionsResponseDto> = safeCall {
         if (unansweredOnly) {
-            service.unansweredQuestions(fromDate, page, pageSize)
+            service.unansweredQuestions(fromDate, page, pageSize, toDate)
         } else {
-            service.latestQuestions(fromDate, page, pageSize)
+            service.latestQuestions(fromDate, page, pageSize, toDate)
         }
     }
 

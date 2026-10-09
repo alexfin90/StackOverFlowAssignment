@@ -1,11 +1,13 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.home
 
-import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import androidx.lifecycle.SavedStateHandle
-import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadQuestionsPageUseCase
-import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import com.alexfin90.stackoverflowsdk.domain.SdkError
-import kotlinx.coroutines.delay
+import com.alexfin90.stackoverflowsdk.domain.PagerStatus
+import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerState
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -16,75 +18,94 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
+/** The ViewModel against a hand-driven pager: it only maps the pager's state and forwards events. */
 @RunWith(RobolectricTestRunner::class)
 class HomeViewModelTest {
 
     @get:Rule
     val mainRule = MainDispatcherRule()
 
-    private val repository = FakeQuestionsRepository()
+    private val pagers = FakePagerFactory()
 
-    private fun viewModel(handle: SavedStateHandle = SavedStateHandle()) =
-        HomeViewModel(LoadQuestionsPageUseCase(repository), handle)
+    // The state is shared Lazily: it only runs while somebody collects it, like the screen does.
+    private fun TestScope.viewModel(handle: SavedStateHandle = SavedStateHandle()) =
+        HomeViewModel(pagers, handle, mainRule.dispatcher).also { vm ->
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
+        }
 
     private fun HomeViewModel.questions() = state.value.content as HomeContent.Questions
 
-    @Test
-    fun `starts in loading and requests the first page unfiltered`() = runTest(mainRule.dispatcher) {
-        val vm = viewModel()
+    private fun pagerState(
+        vararg ids: Long,
+        hasMore: Boolean = false,
+        status: PagerStatus = PagerStatus.Idle,
+        isLoaded: Boolean = true,
+    ) = QuestionsPagerState(ids.map { question(it) }, hasMore, status, isLoaded)
 
-        assertEquals(HomeContent.Loading, vm.state.value.content)
+    @Test
+    fun `starts loading and refreshes the first pager`() = runTest(mainRule.dispatcher) {
+        val vm = viewModel()
         advanceUntilIdle()
 
-        assertEquals(listOf(false to 1), repository.calls)
+        assertEquals(HomeContent.Loading, vm.state.value.content)
+        assertEquals(1, pagers.created.size)
+        assertFalse(pagers.last.unansweredOnly)
+        assertEquals(1, pagers.last.refreshes)
     }
 
     @Test
-    fun `success shows the questions`() = runTest(mainRule.dispatcher) {
-        repository.onLatest = { _, _ ->
-            QuestionsResult.Success(listOf(question(1), question(2)), hasMore = true)
-        }
+    fun `shows the pager's questions`() = runTest(mainRule.dispatcher) {
         val vm = viewModel()
+        advanceUntilIdle()
+
+        pagers.last.state.value = pagerState(1, 2, hasMore = true)
         advanceUntilIdle()
 
         assertEquals(listOf(1L, 2L), vm.questions().items.map { it.id })
         assertTrue(vm.questions().canLoadMore)
+        assertFalse(vm.questions().isLoadingMore)
     }
 
     @Test
-    fun `empty result shows the empty state`() = runTest(mainRule.dispatcher) {
+    fun `loaded and empty shows the empty state, not loaded shows loading`() = runTest(mainRule.dispatcher) {
         val vm = viewModel()
+        advanceUntilIdle()
+        assertEquals(HomeContent.Loading, vm.state.value.content)
+
+        pagers.last.state.value = pagerState(isLoaded = true)
         advanceUntilIdle()
 
         assertEquals(HomeContent.Empty, vm.state.value.content)
     }
 
     @Test
-    fun `network error then retry recovers`() = runTest(mainRule.dispatcher) {
-        repository.onLatest = { _, _ -> QuestionsResult.Failure(SdkError.Network("offline")) }
+    fun `a failure before any question maps to the matching error`() = runTest(mainRule.dispatcher) {
         val vm = viewModel()
+        advanceUntilIdle()
+
+        pagers.last.state.value = pagerState(isLoaded = false, status = PagerStatus.Failed(SdkError.Network("offline")))
         advanceUntilIdle()
         assertEquals(HomeContent.Error(LoadFailure.Network), vm.state.value.content)
 
-        repository.onLatest = { _, _ -> QuestionsResult.Success(listOf(question(1)), false) }
-        vm.onRetry()
-        assertEquals(HomeContent.Loading, vm.state.value.content)
+        pagers.last.state.value = pagerState(isLoaded = false, status = PagerStatus.Failed(SdkError.Api(500, "boom")))
         advanceUntilIdle()
-
-        assertEquals(1, vm.questions().items.size)
-    }
-
-    @Test
-    fun `api error maps to server error`() = runTest(mainRule.dispatcher) {
-        repository.onLatest = { _, _ -> QuestionsResult.Failure(SdkError.Api(500, "boom")) }
-        val vm = viewModel()
-        advanceUntilIdle()
-
         assertEquals(HomeContent.Error(LoadFailure.Server), vm.state.value.content)
     }
 
     @Test
-    fun `toggling the filter reloads from page one with unanswered only`() = runTest(mainRule.dispatcher) {
+    fun `retry asks the same pager to refresh again`() = runTest(mainRule.dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.onRetry()
+        advanceUntilIdle()
+
+        assertEquals(1, pagers.created.size)
+        assertEquals(2, pagers.last.refreshes)
+    }
+
+    @Test
+    fun `toggling the filter creates a new pager for the new filter and refreshes it`() = runTest(mainRule.dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
 
@@ -92,110 +113,101 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertTrue(vm.state.value.unansweredOnly)
-        assertEquals(listOf(false to 1, true to 1), repository.calls)
+        assertEquals(2, pagers.created.size)
+        assertTrue(pagers.last.unansweredOnly)
+        assertEquals(1, pagers.last.refreshes)
     }
 
     @Test
-    fun `filter survives recreation through SavedStateHandle`() = runTest(mainRule.dispatcher) {
+    fun `the old pager can no longer reach the screen after a filter change`() = runTest(mainRule.dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        val old = pagers.last
+
+        vm.onUnansweredToggled()
+        advanceUntilIdle()
+        old.state.value = pagerState(1, 2, 3) // a late answer of the previous filter
+        advanceUntilIdle()
+
+        assertEquals(HomeContent.Loading, vm.state.value.content)
+
+        pagers.last.state.value = pagerState(9)
+        advanceUntilIdle()
+        assertEquals(listOf(9L), vm.questions().items.map { it.id })
+    }
+
+    @Test
+    fun `a filter change cancels the request still running for the old pager`() = runTest(mainRule.dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        pagers.last.hangOnRefresh = true
+        vm.onRetry()
+        advanceUntilIdle()
+        val old = pagers.last
+        assertFalse(old.refreshCancelled)
+
+        vm.onUnansweredToggled()
+        advanceUntilIdle()
+
+        assertTrue(old.refreshCancelled)
+    }
+
+    @Test
+    fun `the filter is restored from the saved state`() = runTest(mainRule.dispatcher) {
         val handle = SavedStateHandle()
-        val first = viewModel(handle)
-        first.onUnansweredToggled()
+        viewModel(handle).onUnansweredToggled()
         advanceUntilIdle()
 
         val recreated = viewModel(handle)
         advanceUntilIdle()
 
         assertTrue(recreated.state.value.unansweredOnly)
+        assertTrue(pagers.last.unansweredOnly)
     }
 
     @Test
-    fun `stale response is ignored when the filter changes while loading`() = runTest(mainRule.dispatcher) {
-        repository.onLatest = { unanswered, _ ->
-            if (unanswered) {
-                QuestionsResult.Success(listOf(question(2, answers = 0)), false)
-            } else {
-                delay(1_000)
-                QuestionsResult.Success(listOf(question(1)), false)
-            }
-        }
-        val vm = viewModel()
-        vm.onUnansweredToggled()
-        advanceUntilIdle()
-
-        assertEquals(listOf(2L), vm.questions().items.map { it.id })
-    }
-
-    @Test
-    fun `load more appends the next page and removes duplicates`() = runTest(mainRule.dispatcher) {
-        repository.onLatest = { _, page ->
-            if (page == 1) {
-                QuestionsResult.Success(listOf(question(1), question(2)), hasMore = true)
-            } else {
-                QuestionsResult.Success(listOf(question(2), question(3)), hasMore = false)
-            }
-        }
+    fun `load more is forwarded to the pager`() = runTest(mainRule.dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
 
         vm.onLoadMore()
+        advanceUntilIdle()
+
+        assertEquals(1, pagers.last.loadMores)
+    }
+
+    @Test
+    fun `shows the footer loader while the pager loads more`() = runTest(mainRule.dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        pagers.last.state.value = pagerState(1, 2, hasMore = true, status = PagerStatus.LoadingMore)
+        advanceUntilIdle()
+
         assertTrue(vm.questions().isLoadingMore)
-        advanceUntilIdle()
-
-        assertEquals(listOf(1L, 2L, 3L), vm.questions().items.map { it.id })
-        assertFalse(vm.questions().canLoadMore)
-        assertFalse(vm.questions().isLoadingMore)
-        assertEquals(2, repository.calls.last().second)
     }
 
     @Test
-    fun `load more does nothing when there are no more pages`() = runTest(mainRule.dispatcher) {
-        repository.onLatest = { _, _ -> QuestionsResult.Success(listOf(question(1)), hasMore = false) }
+    fun `a failed load more keeps the list`() = runTest(mainRule.dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
 
-        vm.onLoadMore()
+        pagers.last.state.value =
+            pagerState(1, 2, hasMore = true, status = PagerStatus.Failed(SdkError.Network("offline")))
         advanceUntilIdle()
 
-        assertEquals(1, repository.calls.size)
-    }
-
-    @Test
-    fun `failed load more keeps the list`() = runTest(mainRule.dispatcher) {
-        repository.onLatest = { _, page ->
-            if (page == 1) {
-                QuestionsResult.Success(listOf(question(1)), hasMore = true)
-            } else {
-                QuestionsResult.Failure(SdkError.Network("offline"))
-            }
-        }
-        val vm = viewModel()
-        advanceUntilIdle()
-
-        vm.onLoadMore()
-        advanceUntilIdle()
-
-        assertEquals(listOf(1L), vm.questions().items.map { it.id })
+        assertEquals(listOf(1L, 2L), vm.questions().items.map { it.id })
         assertFalse(vm.questions().isLoadingMore)
     }
 
     @Test
-    fun `changing the filter after loading more replaces the list, it does not append`() = runTest(mainRule.dispatcher) {
-        repository.onLatest = { unanswered, page ->
-            when {
-                unanswered -> QuestionsResult.Success(listOf(question(9, answers = 0)), hasMore = false)
-                page == 1 -> QuestionsResult.Success(listOf(question(1), question(2)), hasMore = true)
-                else -> QuestionsResult.Success(listOf(question(3)), hasMore = false)
-            }
-        }
+    fun `refreshing with questions already shown keeps them on screen`() = runTest(mainRule.dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
-        vm.onLoadMore()
-        advanceUntilIdle()
-        assertEquals(listOf(1L, 2L, 3L), vm.questions().items.map { it.id })
 
-        vm.onUnansweredToggled()
+        pagers.last.state.value = pagerState(1, 2, status = PagerStatus.Refreshing)
         advanceUntilIdle()
 
-        assertEquals(listOf(9L), vm.questions().items.map { it.id })
+        assertEquals(listOf(1L, 2L), vm.questions().items.map { it.id })
     }
 }

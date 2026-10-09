@@ -1,8 +1,10 @@
 package com.alexfin90.stackoverflowsdk
 
 import com.alexfin90.stackoverflowsdk.api.StackOverflowConfig
-import com.alexfin90.stackoverflowsdk.data.createQuestionsRepository
+import com.alexfin90.stackoverflowsdk.data.QuestionsServices
+import com.alexfin90.stackoverflowsdk.data.createQuestionsServices
 import android.util.Log
+import com.alexfin90.stackoverflowsdk.domain.QuestionsPagerFactory
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 
 /**
@@ -40,7 +42,7 @@ public object StackOverflowSdk {
 
     private val lock = Any()
     private var configuration: StackOverflowConfig? = null
-    private var shared: QuestionsRepository? = null
+    private var shared: QuestionsServices? = null
 
     /** Receives the "initialize ignored" warning. Replaced in tests, which have no Logcat. */
     internal var warningSink: (String) -> Unit = { Log.w(LOG_TAG, it) }
@@ -77,10 +79,15 @@ public object StackOverflowSdk {
      * background thread at startup to avoid paying that on the main thread.
      */
     public val questions: QuestionsRepository
-        get() = synchronized(lock) {
-            shared ?: build(configuration ?: StackOverflowConfig().also { configuration = it })
-                .also { shared = it }
-        }
+        get() = services().repository
+
+    /**
+     * Creates **paged lists** of the latest questions (see [com.alexfin90.stackoverflowsdk.domain.QuestionsPager]).
+     * They share the HTTP client and the configuration of [questions]; the same rules apply as for
+     * [questions] about [initialize] and [warmUp].
+     */
+    public val pagers: QuestionsPagerFactory
+        get() = services().pagers
 
     /**
      * Builds the shared repository now. Idempotent. It does no network I/O but allocates the HTTP
@@ -96,7 +103,7 @@ public object StackOverflowSdk {
      * owns the HTTP client.
      */
     public fun create(config: StackOverflowConfig = StackOverflowConfig()): QuestionsRepository =
-        build(config)
+        build(config).repository
 
     /** Clears the shared state so tests can start from scratch. Not part of the public API. */
     internal fun resetForTesting() {
@@ -107,8 +114,13 @@ public object StackOverflowSdk {
         }
     }
 
-    private fun build(config: StackOverflowConfig): QuestionsRepository =
-        createQuestionsRepository(
+    private fun services(): QuestionsServices = synchronized(lock) {
+        shared ?: build(configuration ?: StackOverflowConfig().also { configuration = it })
+            .also { shared = it }
+    }
+
+    private fun build(config: StackOverflowConfig): QuestionsServices =
+        createQuestionsServices(
             baseUrl = config.baseUrl,
             pageSize = config.pageSize,
             lastDays = config.lastDays,

@@ -37,14 +37,72 @@ prefer to own the instance (tests, DI container, several configurations), use
 | `QuestionsRepository` | `suspend fun getLatestQuestions(unansweredOnly, page): QuestionsResult` and `suspend fun getQuestion(id): QuestionResult` |
 | `QuestionsResult` | Sealed: `Success(questions, hasMore)` / `Failure(error)` |
 | `QuestionResult` | Same idea for one question: `Success(question)` / `NotFound` / `Failure(error)` |
-| `SdkError` | Why a call failed, **one hierarchy for every result**: `Network(message)` / `Api(httpCode?, message)`. A new kind of error is added in one place. |
+| `SdkError` | Why a call failed, **one hierarchy for every result and for the pager**: `Network(message)` / `Api(httpCode?, message)`. A new kind of error is added in one place. |
+| `StackOverflowSdk.pagers` | Factory of `QuestionsPager`: a paged, growing list with its state (see below). |
+| `QuestionsPager` | `state: StateFlow<QuestionsPagerState>`, `suspend refresh()`, `suspend loadMore()` |
 | `Question` | Plain domain model, independent from the wire format. Title is already HTML-decoded. |
+
+## Paged list: `QuestionsPager`
+
+The repository gives **one page at a time** and keeps nothing between calls. A host that shows a
+growing list has to join pages, remove duplicates and decide what happens on failure. The pager does
+that inside the SDK:
+
+```kotlin
+val pager = StackOverflowSdk.pagers.create(unansweredOnly = true)
+scope.launch { pager.state.collect { render(it) } }   // questions, hasMore, status
+scope.launch { pager.refresh() }                       // first page
+scope.launch { pager.loadMore() }                      // when the user nears the end
+```
+
+`QuestionsPagerState` has the `questions` loaded so far, `hasMore`, `isLoaded` (a page was loaded at
+least once: it tells "nothing yet" from "loaded and empty") and a `status`:
+`Idle`, `Refreshing`, `LoadingMore` or `Failed(error)`, where `error` is the same `SdkError` as the repository's.
+
+Rules (all covered by tests; the ones that matter were checked by breaking them on purpose):
+
+- **Starts empty and idle**; call `refresh()` first. One pager per filter value.
+- **One request at a time** (a `Mutex`; the state transitions themselves use `StateFlow.update`, which
+  is atomic but cannot wrap a network call, so the lock is what keeps two callers from asking for the same page). `loadMore()` returns at once if something is running or there
+  is no next page, so calling it on every scroll event is safe. `refresh()` waits for its turn and
+  replaces the list.
+- **A snapshot of "now" is fixed at `refresh()`**: every page is requested with the same `fromdate`
+  and `todate`. The window cannot slide while the user scrolls, so a question posted meanwhile
+  cannot shift the pages or come back twice. De-duplicating by id is kept as a safety net.
+- **Failures are values**: `Failed(SdkError.Network)` or `Failed(SdkError.Api)`. The questions already loaded are kept,
+  and calling again retries the same page.
+- **No threads, no scope**: the calls run in the coroutine of the caller. Cancelling it cancels the
+  request and restores the state as it was; the lock is released.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: created (empty, not loaded)
+    Idle --> Refreshing: refresh()
+    Failed --> Refreshing: refresh()
+    Idle --> LoadingMore: loadMore() (hasMore)
+    Failed --> LoadingMore: loadMore() (hasMore)
+    Refreshing --> Idle: success
+    LoadingMore --> Idle: success
+    Refreshing --> Failed: error
+    LoadingMore --> Failed: error
+    Refreshing --> Idle: cancelled (as before)
+    LoadingMore --> Idle: cancelled (as before)
+```
+
+Trade-offs, stated openly:
+
+- **State in the public API.** The SDK was stateless on purpose; the pager is the one object that
+  holds state (the loaded list). It is created by the caller, which decides how long it lives.
+- **`kotlinx-coroutines` is now a public dependency** of the SDK (`StateFlow` is in the API). It is
+  one more version that can clash with the host's, see [dependency conflicts](dependency-conflicts.md).
+- **Memory grows** with the pages loaded; there is no cap.
+- A question **deleted** while scrolling can be skipped between two pages.
 
 ### Why one error type
 
 The errors used to be repeated in each result (`QuestionsResult.NetworkError`, `QuestionResult.NetworkError`, ...),
 and the app repeated them again in each screen. Adding one kind of error (for example throttling) meant
-touching six types. Now the SDK has one `SdkError`, wrapped by each result's `Failure`, and the app
+touching six types. Now the SDK has one `SdkError`, wrapped by each result's `Failure` and by the pager's `Failed`, and the app
 translates it in one function (`SdkError.toLoadFailure()` in `:core:domain`), and the screens use
 `LoadFailure` directly. Done after the submission, before any public release: changing the shape of
 public results is a breaking change once hosts depend on it.
@@ -58,7 +116,7 @@ case is handled:
 1. **SDK contract**: a new case in `SdkError` (`:stackoverflowsdk:domain`), for example
    `RateLimited(retryAfterSeconds: Int?)`.
 2. **SDK detection**: the data source recognises it and returns a new `RemoteResult.Failure` case;
-   `QuestionsRepositoryImpl.toSdkError()` maps it. Then the compiler asks for the log level and the
+   `RemoteResult.Failure.toSdkError()` maps it (one function, used by the repository and the pager). Then the compiler asks for the log level and the
    description in `LoggingQuestionsRepository`.
 3. **App translation**: a new case in `LoadFailure` and one line in `SdkError.toLoadFailure()`
    (`:core:domain`).
@@ -125,6 +183,8 @@ leave the SDK.
   fails fast with a clear message instead of failing at the first request.
 - **Unanswered filter uses the dedicated endpoint** (`/questions/no-answers`) so the filtering is
   done by the server and pagination stays correct.
+- **Paging is in the SDK** (`QuestionsPager`), not in each app: joining pages, the snapshot window and
+  the failure rules are written and tested once.
 - **No DI framework inside the SDK.** Hilt/Dagger would be imposed on the host (annotation
   processing, application class, version conflicts). Testability comes from plain constructor
   injection (`QuestionsRepositoryImpl` receives its data source, the data source receives the service). Hilt is a good fit for the *sample
