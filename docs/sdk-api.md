@@ -45,7 +45,7 @@ prefer to own the instance (tests, DI container, several configurations), use
 2. **Using the SDK without `initialize` is safe**: the defaults apply, nothing throws. The first
    access then freezes that default configuration.
 3. **`initialize` does not block**: it validates and stores the configuration. The expensive part
-   (OkHttp client, Retrofit) is built on first use or in `warmUp()`, on the caller's thread.
+   (the HTTP data source) is built on first use or in `warmUp()`, on the caller's thread.
 
 ## Logging
 
@@ -108,6 +108,6 @@ leave the SDK.
   with Robolectric.
 - **No offline cache.** Out of scope: the SDK stays stateless (a database would add dependencies
   and conflict risk). A cache would live in the app (e.g. Room as source of truth with a fallback
-  on `NetworkError`) or as an optional OkHttp HTTP cache.
+  on `NetworkError`) or as an HTTP cache (`HttpResponseCache`, part of the platform).
 - **`minSdk` 24**, to keep the SDK integrable by apps with a low minimum.
 - **INTERNET permission** is declared in the SDK manifest and merged into the host app.

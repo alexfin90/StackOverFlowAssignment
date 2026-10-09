@@ -9,7 +9,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 
 > **Status.** The SDK (`:stackoverflowsdk` + `:api` + `:domain` + `:data`) and the sample app
 > (list with "unanswered" filter, detail screen, deep link, `mock`/`real` flavors) are implemented,
-> with 107 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
+> with 109 unit/UI tests. It was also checked by hand on an Android emulator (list on the `real`
 > flavor, detail through the deep link on `mock`), but **not on a physical device**, see
 > [known limitations](docs/roadmap-and-limitations.md#known-limitations).
 
@@ -39,16 +39,17 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 
 ---
 
-> [!WARNING]
-> **Retrofit/OkHttp are hidden at compile time, not at runtime.**
+> [!NOTE]
+> **No HTTP library: nothing to clash with the host's OkHttp or Retrofit.**
 >
-> `:stackoverflowsdk:data` declares Retrofit, OkHttp and kotlinx.serialization with
-> `implementation`, so host apps cannot import them. But at *runtime* Gradle resolves each library
-> to a **single version, the highest one requested by anyone**: if the host app uses another OkHttp
-> or Retrofit version, the SDK runs against the host's, and a binary-incompatible change can crash
-> **inside the host app**.
+> The SDK talks to the API with the platform's `HttpURLConnection`. `implementation` hides a
+> dependency only at compile time: at *runtime* Gradle resolves each library to **one version for
+> the whole app**, so an SDK built on OkHttp would run against the host's OkHttp and could crash
+> inside the host app. On Android `HttpURLConnection` is backed by a private, repackaged copy of
+> OkHttp that belongs to the platform, so it cannot clash. The two runtime dependencies left are
+> kotlinx.serialization and kotlinx.coroutines.
 >
-> Read the trade-off and what I would do in production: [docs/dependency-conflicts.md](docs/dependency-conflicts.md).
+> The trade-off and the alternatives: [docs/dependency-conflicts.md](docs/dependency-conflicts.md).
 
 ---
 
@@ -58,7 +59,7 @@ app can reuse. This project puts the weight on that library: a small, stable, ha
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | Modules and dependencies, request flow, error mapping, design patterns |
 | [docs/sdk-api.md](docs/sdk-api.md) | Public API, initialization rules, logging, coroutine cancellation, design decisions |
-| [docs/dependency-conflicts.md](docs/dependency-conflicts.md) | The main trade-off of using Retrofit, and the alternatives |
+| [docs/dependency-conflicts.md](docs/dependency-conflicts.md) | Why the SDK has no HTTP library, what is left, and the alternatives |
 | [docs/stackexchange-api.md](docs/stackexchange-api.md) | The Stack Exchange endpoints used and the quirks of the API |
 | [docs/sample-app.md](docs/sample-app.md) | The sample app: features, modules, use cases and how paging works, flavors, deep link, Compose practices |
 | [docs/testing.md](docs/testing.md) | **Test strategy, tools, how to run, coverage** |
@@ -122,7 +123,7 @@ StackOverFlow Home Assignment
 └── stackoverflowsdk          # Facade (Android library): StackOverflowSdk
     ├── api                   # Public configuration: StackOverflowConfig (pure JVM)
     ├── domain                # Question, QuestionsResult, QuestionsRepository (pure JVM)
-    └── data                  # Retrofit service, DTOs, mapper, repository impl (Android library)
+    └── data                  # HttpURLConnection data source, DTOs, mapper, repository impl (Android library)
 ```
 
 ---
@@ -131,7 +132,7 @@ StackOverFlow Home Assignment
 
 - **Language**: Kotlin `2.2.10`, JDK `17` (Gradle toolchain)
 - **Build**: AGP `9.3.3`, Gradle version catalog (no convention plugins)
-- **Networking**: Retrofit `3.0.0`, OkHttp `4.12.0` (explicit timeouts), kotlinx.serialization `1.10.0`
+- **Networking**: the platform's `HttpURLConnection` (no HTTP library; connect timeout plus a total call timeout), kotlinx.serialization `1.10.0`; OkHttp `4.12.0` only in tests (MockWebServer)
 - **Async**: Kotlin Coroutines `1.10.2`
 - **UI**: Jetpack Compose (BOM `2026.02.01`), Material 3, Navigation Compose `2.9.3` (type-safe routes),
   kotlinx-collections-immutable `0.4.0`

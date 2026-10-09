@@ -5,9 +5,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.SocketPolicy
+import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -15,18 +17,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.TimeUnit
+import java.util.zip.GZIPOutputStream
 
-/** Transport behaviour: requests sent and exceptions translated, against a real HTTP stack. */
-class RetrofitQuestionsRemoteDataSourceTest {
+/** Transport behaviour: requests sent and exceptions translated, against a real HTTP server. */
+class UrlConnectionQuestionsRemoteDataSourceTest {
 
     private val server = MockWebServer()
     private lateinit var remote: QuestionsRemoteDataSource
 
-    private fun remoteFor(baseUrl: String): QuestionsRemoteDataSource {
-        val client = NetworkModule.provideOkHttpClient(connectTimeoutSeconds = 5, callTimeoutSeconds = 10)
-        val retrofit = NetworkModule.provideRetrofit(baseUrl, client, NetworkModule.provideJson())
-        return NetworkModule.provideRemoteDataSource(NetworkModule.provideService(retrofit))
-    }
+    private fun remoteFor(baseUrl: String, callTimeoutMillis: Long = 10_000): QuestionsRemoteDataSource =
+        UrlConnectionQuestionsRemoteDataSource(
+            baseUrl = baseUrl,
+            json = NetworkModule.provideJson(),
+            connectTimeoutMillis = 5_000,
+            callTimeoutMillis = callTimeoutMillis,
+        )
 
     @Before
     fun setUp() {
@@ -41,6 +46,11 @@ class RetrofitQuestionsRemoteDataSourceTest {
 
     private fun json(body: String, code: Int = 200) =
         MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(body)
+
+    // HttpURLConnection retries a failed GET once by itself, so "down" must fail both attempts.
+    private fun serverDown() = repeat(2) {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+    }
 
     private suspend fun latest(unanswered: Boolean = false) =
         remote.getLatestQuestions(fromDate = 1_000, page = 2, pageSize = 20, unansweredOnly = unanswered)
@@ -98,7 +108,7 @@ class RetrofitQuestionsRemoteDataSourceTest {
 
     @Test
     fun `connection failure becomes Network`() = runTest {
-        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        serverDown()
 
         assertTrue(latest() is RemoteResult.Failure.Network)
     }
@@ -131,7 +141,7 @@ class RetrofitQuestionsRemoteDataSourceTest {
 
     @Test
     fun `getQuestion connection failure becomes Network`() = runTest {
-        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        serverDown()
 
         assertTrue(remote.getQuestion(1) is RemoteResult.Failure.Network)
     }
@@ -144,11 +154,41 @@ class RetrofitQuestionsRemoteDataSourceTest {
 
         val job = launch(Dispatchers.IO) { returned = latest() }
         server.takeRequest(5, TimeUnit.SECONDS) // the request is really in flight
+        val start = System.nanoTime()
         job.cancelAndJoin()
+
+        // The blocking read is stopped at once (connection closed), not after the 10 s read timeout.
+        assertTrue("cancel took too long", System.nanoTime() - start < TimeUnit.SECONDS.toNanos(2))
 
         // If the cancellation had been swallowed, `returned` would be a Failure.Unexpected.
         assertNull(returned)
         assertTrue(job.isCancelled)
         // runTest also fails on any uncaught exception, so reaching this line means no crash.
+    }
+
+    @Test
+    fun `a gzip body is decompressed`() = runTest {
+        val gzipped = Buffer().apply {
+            GZIPOutputStream(outputStream()).use {
+                it.write("""{"items":[{"question_id":7,"title":"t","link":"l","creation_date":1}]}""".toByteArray())
+            }
+        }
+        server.enqueue(json("").setHeader("Content-Encoding", "gzip").setBody(gzipped))
+
+        assertEquals(7L, (latest() as RemoteResult.Success).value.items.single().questionId)
+    }
+
+    @Test
+    fun `a body that trickles in longer than the call timeout becomes Network`() = runTest {
+        // Every chunk arrives well within the read timeout, so only the total call timeout can stop it.
+        remote = remoteFor(server.url("/").toString(), callTimeoutMillis = 500)
+        val body = """{"items":[],"padding":"${"x".repeat(200)}"}"""
+        server.enqueue(json(body).throttleBody(10, 100, TimeUnit.MILLISECONDS)) // about 2 s in total
+        val start = System.nanoTime()
+
+        val result = withContext(Dispatchers.IO) { latest() }
+
+        assertTrue(result is RemoteResult.Failure.Network)
+        assertTrue("took too long", System.nanoTime() - start < TimeUnit.MILLISECONDS.toNanos(1_500))
     }
 }

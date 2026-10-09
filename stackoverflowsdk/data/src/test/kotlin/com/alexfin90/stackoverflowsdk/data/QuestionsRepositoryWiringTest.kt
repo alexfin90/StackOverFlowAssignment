@@ -79,7 +79,8 @@ class QuestionsRepositoryWiringTest {
 
     @Test
     fun `connection failure maps to NetworkError`() = runTest {
-        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        // HttpURLConnection retries a failed GET once by itself: both attempts must fail.
+        repeat(2) { server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)) }
 
         assertTrue(repository.getLatestQuestions() is QuestionsResult.NetworkError)
     }

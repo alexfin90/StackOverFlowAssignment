@@ -2,7 +2,7 @@
 
 # Testing
 
-107 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
+109 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
 what is tested at each layer, with which tools, how to run it, and how to see the coverage.
 
 - [Strategy](#strategy)
@@ -21,10 +21,10 @@ An SDK has a slow feedback loop with its users (a bank updates it every few mont
 is on **many fast unit tests of the logic** and **few tests that exercise the real HTTP stack**.
 
 ```
-        few        Wiring: real Retrofit + OkHttp against a local server (3 tests)
+        few        Wiring: the real HTTP client against a local server (3 tests)
        ─────
      some          Remote data source against a local server: what goes on the wire,
-    ───────        how each failure becomes a result (11 tests)
+    ───────        how each failure becomes a result, timeouts, gzip, cancellation (13 tests)
    many            Everything else against fakes: repository, decorator, facade, config,
   ─────────        mapper, ViewModels, Compose screens, routes, the top bar and the use cases (93 tests)
 ```
@@ -42,7 +42,7 @@ Rules followed everywhere:
 
 | Module | Tests | What |
 |---|---|---|
-| `:stackoverflowsdk:data` | 36 | mapper (5), remote data source (11), repository (9), logging decorator (8), end-to-end wiring (3) |
+| `:stackoverflowsdk:data` | 38 | mapper (5), remote data source (13), repository (9), logging decorator (8), end-to-end wiring (3) |
 | `:stackoverflowsdk:api` | 6 | configuration defaults and validation |
 | `:stackoverflowsdk` | 12 | `initialize`, `warmUp`, shared instance, concurrency, `create()` |
 | `:core:designsystem` | 8 | components (Compose UI), title alignment, top bar, test tags exposed as `resource-id` |
@@ -50,7 +50,7 @@ Rules followed everywhere:
 | `:feature:detail` | 10 | 4 ViewModel + 4 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:app` | 4 | `MainViewModel`: top bar state per destination |
 | `:core:domain` | 11 | use cases: paging with de-duplication, error translation (plain JVM) |
-| **Total** | **107** | |
+| **Total** | **109** | |
 
 ## Tools, and why
 
@@ -58,7 +58,7 @@ Rules followed everywhere:
 |---|---|---|
 | **JUnit 4** | The test framework | Every test |
 | **kotlinx-coroutines-test** | `runTest`, virtual time, `StandardTestDispatcher` | Testing `suspend` code and ViewModels without real waiting |
-| **MockWebServer** | A tiny **real HTTP server** that starts inside the test, on `localhost` | Testing Retrofit + OkHttp for real, without the internet |
+| **MockWebServer** | A tiny **real HTTP server** that starts inside the test, on `localhost` | Testing the real HTTP client, without the internet |
 | **Robolectric** | A test runner that provides the Android framework on the JVM | Code that uses `Html`, `Bundle`, `SavedStateHandle`, Compose |
 | **Compose UI test** | `createComposeRule`, `onNodeWithText`, `performClick` | UI tests of the screens |
 
@@ -66,7 +66,7 @@ Rules followed everywhere:
 
 [MockWebServer](https://github.com/square/okhttp/tree/master/mockwebserver) (from the OkHttp
 project) opens a real server on a random port of `localhost`. The test queues the responses it
-wants, points Retrofit at the server, makes the real call, and can inspect the request that arrived:
+wants, points the SDK at the server, makes the real call, and can inspect the request that arrived:
 
 ```kotlin
 server.enqueue(json("""{"items":[...],"has_more":true}"""))          // the answer to give
@@ -76,8 +76,8 @@ assertEquals("/2.3/questions", request.requestUrl!!.encodedPath)
 assertEquals("2", request.requestUrl!!.queryParameter("page"))
 ```
 
-Why not mock the Retrofit service instead? Because the real stack is what can be wrong: a misspelled
-`@Query`, a renamed JSON field, a converter that fails. A mocked service would let all of that pass.
+Why not mock the HTTP layer instead? Because the real stack is what can be wrong: a misspelled
+query parameter, a renamed JSON field, a body that cannot be parsed. A mocked service would let all of that pass.
 It also simulates failures that are hard to fake otherwise:
 
 | Simulation | How | Result checked |
@@ -122,7 +122,7 @@ would add (see [What is not tested](#what-is-not-tested)).
 | Test class | Uses | Covers |
 |---|---|---|
 | `QuestionMapperTest` (5) | Robolectric | HTML entities (numeric, hex, named, no double decoding), DTO to domain, missing author |
-| `RetrofitQuestionsRemoteDataSourceTest` (11) | MockWebServer | endpoints and query parameters (`fromdate`, `page`, `pagesize`, `sort`, `site`), `no-answers` for the filter, `/questions/{id}`, unknown JSON fields ignored, HTTP error, malformed body, connection failure, unknown host, **cancellation** |
+| `UrlConnectionQuestionsRemoteDataSourceTest` (13) | MockWebServer | endpoints and query parameters (`fromdate`, `page`, `pagesize`, `sort`, `site`), `no-answers` for the filter, `/questions/{id}`, unknown JSON fields ignored, HTTP error, malformed body, connection failure, unknown host, gzip body, **total call timeout** (a body that trickles in), **cancellation** stops at once |
 | `QuestionsRepositoryImplTest` (9) | fake data source + Robolectric | DTO to domain mapping, the 30-day `fromdate` window, parameters passed down, every failure kind mapped to the right public result, `getQuestion` (found, not found, failures) |
 | `LoggingQuestionsRepositoryTest` (8) | fake repository, fake log sink | exact line format, levels, **no content in the lines**, a failing sink or a cancellation does not break the request, `getQuestion` lines |
 | `QuestionsRepositoryWiringTest` (3) | MockWebServer + Robolectric | the whole chain through the public factory: success, unanswered endpoint, connection failure |
@@ -190,7 +190,7 @@ One module, or one test:
 
 ```bash
 ./gradlew :stackoverflowsdk:data:testDebugUnitTest
-./gradlew :stackoverflowsdk:data:testDebugUnitTest --tests "*RetrofitQuestionsRemoteDataSourceTest.cancelling*"
+./gradlew :stackoverflowsdk:data:testDebugUnitTest --tests "*UrlConnectionQuestionsRemoteDataSourceTest.cancelling*"
 ```
 
 Gradle writes an **HTML report** for each module, with the result of every test:
