@@ -6,6 +6,7 @@ import com.alexfin90.stackoverflowsdk.domain.Question
 import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -57,7 +58,7 @@ class LoggingQuestionsRepositoryTest {
 
     @Test
     fun `network error is logged as a warning without the exception message`() = runTest {
-        val repo = repository(FakeDelegate { QuestionsResult.NetworkError("Unable to resolve host x") })
+        val repo = repository(FakeDelegate { QuestionsResult.Failure(SdkError.Network("Unable to resolve host x")) })
 
         repo.getLatestQuestions()
 
@@ -69,7 +70,7 @@ class LoggingQuestionsRepositoryTest {
 
     @Test
     fun `api error is logged as an error with the http code`() = runTest {
-        val repo = repository(FakeDelegate { QuestionsResult.ApiError(400, "throttle_violation") })
+        val repo = repository(FakeDelegate { QuestionsResult.Failure(SdkError.Api(400, "throttle_violation")) })
 
         repo.getLatestQuestions()
 
@@ -81,7 +82,7 @@ class LoggingQuestionsRepositoryTest {
 
     @Test
     fun `the result is returned untouched`() = runTest {
-        val expected = QuestionsResult.NetworkError("x")
+        val expected = QuestionsResult.Failure(SdkError.Network("x"))
 
         assertSame(expected, repository(FakeDelegate { expected }).getLatestQuestions())
     }
@@ -124,8 +125,8 @@ class LoggingQuestionsRepositoryTest {
     @Test
     fun `getQuestion not found is a debug line and errors keep their level`() = runTest {
         repository(FakeDelegate(questionResult = { QuestionResult.NotFound })).getQuestion(1)
-        repository(FakeDelegate(questionResult = { QuestionResult.NetworkError("offline") })).getQuestion(1)
-        repository(FakeDelegate(questionResult = { QuestionResult.ApiError(500, "e") })).getQuestion(1)
+        repository(FakeDelegate(questionResult = { QuestionResult.Failure(SdkError.Network("offline")) })).getQuestion(1)
+        repository(FakeDelegate(questionResult = { QuestionResult.Failure(SdkError.Api(500, "e")) })).getQuestion(1)
 
         assertEquals(listOf(LogLevel.DEBUG, LogLevel.WARN, LogLevel.ERROR), lines.map { it.first })
         assertTrue(lines.last().second.contains("ApiError(httpCode=500)"))

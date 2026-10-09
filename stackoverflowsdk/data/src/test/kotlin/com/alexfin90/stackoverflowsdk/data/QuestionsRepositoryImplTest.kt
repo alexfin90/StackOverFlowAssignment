@@ -7,6 +7,7 @@ import com.alexfin90.stackoverflowsdk.data.remote.QuestionsResponseDto
 import com.alexfin90.stackoverflowsdk.data.remote.RemoteResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionResult
 import com.alexfin90.stackoverflowsdk.domain.QuestionsResult
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -82,7 +83,7 @@ class QuestionsRepositoryImplTest {
     fun `network failure becomes NetworkError`() = runTest {
         val remote = FakeRemote(RemoteResult.Failure.Network("offline"))
 
-        val result = repository(remote).getLatestQuestions() as QuestionsResult.NetworkError
+        val result = repository(remote).getLatestQuestions().error() as SdkError.Network
 
         assertEquals("offline", result.message)
     }
@@ -91,7 +92,7 @@ class QuestionsRepositoryImplTest {
     fun `http failure becomes ApiError with the code`() = runTest {
         val remote = FakeRemote(RemoteResult.Failure.Http(400, "Bad Request"))
 
-        val result = repository(remote).getLatestQuestions() as QuestionsResult.ApiError
+        val result = repository(remote).getLatestQuestions().error() as SdkError.Api
 
         assertEquals(400, result.httpCode)
     }
@@ -99,7 +100,7 @@ class QuestionsRepositoryImplTest {
     @Test
     fun `malformed body becomes ApiError without a code`() = runTest {
         val result = repository(FakeRemote(RemoteResult.Failure.Malformed("bad json")))
-            .getLatestQuestions() as QuestionsResult.ApiError
+            .getLatestQuestions().error() as SdkError.Api
 
         assertNull(result.httpCode)
     }
@@ -107,7 +108,7 @@ class QuestionsRepositoryImplTest {
     @Test
     fun `unexpected failure becomes ApiError without a code`() = runTest {
         val result = repository(FakeRemote(RemoteResult.Failure.Unexpected("bug")))
-            .getLatestQuestions() as QuestionsResult.ApiError
+            .getLatestQuestions().error() as SdkError.Api
 
         assertNull(result.httpCode)
         assertEquals("bug", result.message)
@@ -141,9 +142,13 @@ class QuestionsRepositoryImplTest {
         fun withFailure(f: RemoteResult.Failure) =
             FakeRemote(RemoteResult.Success(QuestionsResponseDto()), questionResult = f)
 
-        assertTrue(repository(withFailure(RemoteResult.Failure.Network("x"))).getQuestion(1) is QuestionResult.NetworkError)
-        assertEquals(500, (repository(withFailure(RemoteResult.Failure.Http(500, "e"))).getQuestion(1) as QuestionResult.ApiError).httpCode)
-        assertNull((repository(withFailure(RemoteResult.Failure.Malformed("m"))).getQuestion(1) as QuestionResult.ApiError).httpCode)
-        assertNull((repository(withFailure(RemoteResult.Failure.Unexpected("u"))).getQuestion(1) as QuestionResult.ApiError).httpCode)
+        assertTrue(repository(withFailure(RemoteResult.Failure.Network("x"))).getQuestion(1).error() is SdkError.Network)
+        assertEquals(500, (repository(withFailure(RemoteResult.Failure.Http(500, "e"))).getQuestion(1).error() as SdkError.Api).httpCode)
+        assertNull((repository(withFailure(RemoteResult.Failure.Malformed("m"))).getQuestion(1).error() as SdkError.Api).httpCode)
+        assertNull((repository(withFailure(RemoteResult.Failure.Unexpected("u"))).getQuestion(1).error() as SdkError.Api).httpCode)
     }
+
+    private fun QuestionsResult.error(): SdkError = (this as QuestionsResult.Failure).error
+
+    private fun QuestionResult.error(): SdkError = (this as QuestionResult.Failure).error
 }

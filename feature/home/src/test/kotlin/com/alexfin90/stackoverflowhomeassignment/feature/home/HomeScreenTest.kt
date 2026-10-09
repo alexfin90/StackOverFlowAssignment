@@ -1,5 +1,6 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.home
 
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
@@ -89,7 +90,7 @@ class HomeScreenTest {
     // Unhappy path
     @Test
     fun networkError_showsMessageAndRetryWorks() {
-        show(HomeUiState(content = HomeContent.Error(ErrorReason.Network)))
+        show(HomeUiState(content = HomeContent.Error(LoadFailure.Network)))
 
         composeRule.onNode(hasText("No connection", substring = true)).assertIsDisplayed()
         composeRule.onNodeWithTag(TestTags.ERROR_RETRY).performClick()
@@ -99,7 +100,7 @@ class HomeScreenTest {
 
     @Test
     fun serverError_showsServerMessage() {
-        show(HomeUiState(content = HomeContent.Error(ErrorReason.Server)))
+        show(HomeUiState(content = HomeContent.Error(LoadFailure.Server)))
 
         composeRule.onNode(hasText("not responding", substring = true)).assertIsDisplayed()
     }

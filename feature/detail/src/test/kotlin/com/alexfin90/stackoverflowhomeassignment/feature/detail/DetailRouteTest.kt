@@ -1,5 +1,6 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.detail
 
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -54,7 +55,7 @@ class DetailRouteTest {
         show(vm)
         composeRule.onNodeWithTag(TestTags.LOADING).assertIsDisplayed()
 
-        vm.state.value = DetailUiState.Error(DetailError.Network)
+        vm.state.value = DetailUiState.Error(LoadFailure.Network)
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(TestTags.ERROR_RETRY).performClick()
 

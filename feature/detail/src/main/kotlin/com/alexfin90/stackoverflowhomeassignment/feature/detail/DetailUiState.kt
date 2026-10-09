@@ -1,20 +1,19 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.detail
 
 import androidx.compose.runtime.Immutable
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import kotlinx.collections.immutable.ImmutableList
 
 @Immutable
 sealed interface DetailUiState {
     data object Loading : DetailUiState
 
-    data class Error(val reason: DetailError) : DetailUiState
+    data class Error(val reason: LoadFailure) : DetailUiState
 
     data object NotFound : DetailUiState
 
     data class Content(val question: QuestionDetail) : DetailUiState
 }
-
-enum class DetailError { Network, Server }
 
 @Immutable
 data class QuestionDetail(

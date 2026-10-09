@@ -1,5 +1,6 @@
 package com.alexfin90.stackoverflowhomeassignment.feature.detail
 
+import com.alexfin90.stackoverflowhomeassignment.core.domain.LoadFailure
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -66,7 +67,7 @@ class DetailScreenTest {
     // Unhappy path
     @Test
     fun networkError_showsMessageAndRetryWorks() {
-        show(DetailUiState.Error(DetailError.Network))
+        show(DetailUiState.Error(LoadFailure.Network))
 
         composeRule.onNode(hasText("No connection", substring = true)).assertIsDisplayed()
         composeRule.onNodeWithTag(TestTags.ERROR_RETRY).performClick()

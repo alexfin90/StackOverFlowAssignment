@@ -1,6 +1,7 @@
 package com.alexfin90.stackoverflowhomeassignment.core.domain
 
 import com.alexfin90.stackoverflowsdk.domain.QuestionResult
+import com.alexfin90.stackoverflowsdk.domain.SdkError
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -28,14 +29,14 @@ class GetQuestionUseCaseTest {
 
     @Test
     fun `network error becomes a Network failure`() = runTest {
-        repository.onQuestion = { QuestionResult.NetworkError("offline") }
+        repository.onQuestion = { QuestionResult.Failure(SdkError.Network("offline")) }
 
         assertEquals(LoadFailure.Network, (useCase(1) as QuestionOutcome.Failure).reason)
     }
 
     @Test
     fun `api error becomes a Server failure`() = runTest {
-        repository.onQuestion = { QuestionResult.ApiError(500, "boom") }
+        repository.onQuestion = { QuestionResult.Failure(SdkError.Api(500, "boom")) }
 
         assertEquals(LoadFailure.Server, (useCase(1) as QuestionOutcome.Failure).reason)
     }
