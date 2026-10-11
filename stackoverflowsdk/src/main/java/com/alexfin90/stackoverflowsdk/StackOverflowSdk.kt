@@ -1,6 +1,7 @@
 package com.alexfin90.stackoverflowsdk
 
 import com.alexfin90.stackoverflowsdk.api.StackOverflowConfig
+import com.alexfin90.stackoverflowsdk.api.StackOverflowLogger
 import com.alexfin90.stackoverflowsdk.data.createQuestionsRepository
 import android.util.Log
 import com.alexfin90.stackoverflowsdk.domain.QuestionsRepository
@@ -59,9 +60,10 @@ public object StackOverflowSdk {
         synchronized(lock) {
             val current = configuration
             if (current != null || shared != null) {
-                if ((current ?: StackOverflowConfig()).loggingEnabled) {
-                    warn("initialize() ignored: the SDK is already initialized or in use")
-                }
+                warn(
+                    config = current ?: StackOverflowConfig(),
+                    message = "initialize() ignored: the SDK is already initialized or in use",
+                )
                 false
             } else {
                 configuration = config
@@ -115,11 +117,17 @@ public object StackOverflowSdk {
             connectTimeoutSeconds = config.connectTimeoutSeconds,
             callTimeoutSeconds = config.callTimeoutSeconds,
             loggingEnabled = config.loggingEnabled,
+            logger = config.logger,
         )
 
-    private fun warn(message: String) {
+    /** Goes to the host's logger if there is one, to Logcat if logging is on, nowhere otherwise. */
+    private fun warn(config: StackOverflowConfig, message: String) {
         try {
-            warningSink(message)
+            val logger = config.logger
+            when {
+                logger != null -> logger.log(StackOverflowLogger.Level.WARN, message)
+                config.loggingEnabled -> warningSink(message)
+            }
         } catch (_: Exception) {
             // Logging must never break the SDK.
         }

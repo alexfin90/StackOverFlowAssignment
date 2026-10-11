@@ -31,6 +31,8 @@ android {
 
 dependencies {
     api(project(":stackoverflowsdk:domain"))
+    // For StackOverflowLogger, the host's logger. Pure Kotlin, no dependencies.
+    implementation(project(":stackoverflowsdk:api"))
     implementation(libs.retrofit)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.core)

@@ -33,7 +33,7 @@ prefer to own the instance (tests, DI container, several configurations), use
 | `StackOverflowSdk.questions` | Shared `QuestionsRepository`, built lazily and thread-safe. Uses the defaults if `initialize` was never called. |
 | `StackOverflowSdk.warmUp()` | Builds the shared repository now. Idempotent. Call it **off the main thread**: the SDK creates no threads of its own. |
 | `StackOverflowSdk.create(config)` | Independent repository, ignores `initialize`. Keep and reuse the instance. |
-| `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30), `loggingEnabled` (false). Validated at construction. |
+| `StackOverflowConfig` | `baseUrl`, `pageSize` (1..100), `lastDays` (30), `connectTimeoutSeconds` (10), `callTimeoutSeconds` (30), `loggingEnabled` (false), `logger` (null). Validated at construction. |
 | `QuestionsRepository` | `suspend fun getLatestQuestions(unansweredOnly, page): QuestionsResult` and `suspend fun getQuestion(id): QuestionResult` |
 | `QuestionsResult` | Sealed: `Success(questions, hasMore)` / `Failure(error)` |
 | `QuestionResult` | Same idea for one question: `Success(question)` / `NotFound` / `Failure(error)` |
@@ -94,9 +94,24 @@ One line per request, for example
   server content). This is covered by a test.
 - **Logging cannot break the SDK**: a failure while writing the line (e.g. Logcat unavailable) is
   swallowed.
-- **No custom logger on purpose**: a switch is enough for the need, and a pluggable logger would be
-  one more public type to keep stable. If a host needs to route the lines elsewhere (Timber, a file),
-  an optional `logger` parameter can be added later without breaking anyone.
+- **The host's logger**: Logcat on the user's phone cannot be read in production, so the host can
+  pass its own `StackOverflowLogger` and send the lines where it already collects logs (Timber, a
+  crash reporter). Setting it turns logging on and replaces Logcat. The SDK does not depend on
+  Timber: it exposes a one-method `fun interface`. A logger that throws cannot break a request
+  (same `safeLog`), and it runs on the caller's thread, so it must be fast. The "initialize
+  ignored" warning goes to it too.
+
+  ```kotlin
+  StackOverflowConfig(logger = { level, message ->
+      Timber.tag("StackOverflowSdk").log(level.toPriority(), message)
+  })
+  ```
+
+  The sample app (`real` flavor) does this: the planted Timber tree decides what is shown, all
+  lines in debug, warnings and errors in release. It was first left out to keep the API small and
+  brought back for the production case. Compatibility note: before the first release adding the
+  parameter is free; after a release a new constructor parameter is a binary-incompatible change
+  and a new `Level` value breaks exhaustive `when` in hosts.
 - Implemented as a decorator (`LoggingQuestionsRepository`) that is only created when logging is
   enabled, so the default path pays nothing and the repository stays free of logging code.
 

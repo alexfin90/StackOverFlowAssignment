@@ -2,7 +2,7 @@
 
 # Testing
 
-107 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
+112 automated tests, all running on the JVM: no device, no emulator, no internet. This page explains
 what is tested at each layer, with which tools, how to run it, and how to see the coverage.
 
 - [Strategy](#strategy)
@@ -42,15 +42,15 @@ Rules followed everywhere:
 
 | Module | Tests | What |
 |---|---|---|
-| `:stackoverflowsdk:data` | 36 | mapper (5), remote data source (11), repository (9), logging decorator (8), end-to-end wiring (3) |
-| `:stackoverflowsdk:api` | 6 | configuration defaults and validation |
-| `:stackoverflowsdk` | 12 | `initialize`, `warmUp`, shared instance, concurrency, `create()` |
+| `:stackoverflowsdk:data` | 38 | mapper (5), remote data source (11), repository (9), logging decorator (8), end-to-end wiring (5, including the host logger) |
+| `:stackoverflowsdk:api` | 7 | configuration defaults and validation |
+| `:stackoverflowsdk` | 14 | `initialize`, `warmUp`, shared instance, concurrency, `create()`, warning to the host logger |
 | `:core:designsystem` | 8 | components (Compose UI), title alignment, top bar, test tags exposed as `resource-id` |
 | `:feature:home` | 20 | 12 ViewModel + 6 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:feature:detail` | 10 | 4 ViewModel + 4 Compose UI (happy and unhappy paths) + 2 stateful route |
 | `:app` | 4 | `MainViewModel`: top bar state per destination |
 | `:core:domain` | 11 | use cases: paging with de-duplication, error translation (plain JVM) |
-| **Total** | **107** | |
+| **Total** | **112** | |
 
 ## Tools, and why
 

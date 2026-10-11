@@ -2,6 +2,7 @@ package com.alexfin90.stackoverflowsdk.api
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class StackOverflowConfigTest {
@@ -17,6 +18,11 @@ class StackOverflowConfigTest {
     fun `logging is off by default`() {
         val config = StackOverflowConfig()
         assertFalse(config.loggingEnabled)
+    }
+
+    @Test
+    fun `no host logger by default`() {
+        assertNull(StackOverflowConfig().logger)
     }
 
     @Test(expected = IllegalArgumentException::class)
